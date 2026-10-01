@@ -38,8 +38,7 @@ Plataforma modular de gestão para food service: restaurantes e hamburguerias no
 
 - Git
 - Node.js LTS + pnpm (via Corepack)
-- PostgreSQL 18 em `localhost:5432`, banco `gastrohub` (ICU `pt-BR`), preparado com os scripts de [infra/database/](infra/database/)
-- Docker Desktop com WSL2 (estratégia do banco local, nativo ou Docker, definida no M01)
+- Docker Desktop com WSL2. O banco oficial de desenvolvimento é o PostgreSQL 18 em container (`localhost:5432`, banco `gastrohub`, ICU `pt-BR`), entregue no M01. Os scripts ficam em [infra/database/](infra/database/)
 
 ## Execução local
 

@@ -1,6 +1,6 @@
 # 05 — Ambientes, Docker e Deploy
 
-> Status: **proposta**. Banco local atual: PostgreSQL 18 nativo. A estratégia definitiva do banco local (nativo vs. Docker) será fechada no **M01 — Fundação técnica**, com preferência do responsável por Docker.
+> Status: **proposta**. Decidido: o banco oficial de desenvolvimento será o PostgreSQL 18 em **Docker** na porta 5432 (opção B). A migração acontece no M01. Até lá, o banco local é o PostgreSQL 18 nativo.
 
 ## 1. Avaliação do Docker
 
@@ -38,9 +38,13 @@ DATABASE_MIGRATION_URL=postgres://gastrohub_owner:<senha>@localhost:5432/gastroh
 
 Testes de integração locais usarão um banco separado (`gastrohub_test`), criado no M01, para nunca apagar dados do banco de desenvolvimento.
 
-### Decisão em aberto para o M01: PostgreSQL nativo vs. Docker
+### Decisão (2026-10-01): opção B, PostgreSQL via Docker na porta 5432
 
-O responsável indicou **preferência por PostgreSQL via Docker**. Como o serviço nativo já ocupa `localhost:5432`, as opções são:
+O responsável escolheu a **opção B**. O **banco oficial de desenvolvimento do GastroHub é o container** `postgres:18` na porta 5432. O serviço nativo `postgresql-x64-18` será desativado (início manual, parado), **sem ser desinstalado**, e fica como fallback temporário. A mudança só é executada depois que o Docker Engine estiver operacional (depende do WSL2) e conforme a [especificação do M01](modules/M01-fundacao-tecnica.md).
+
+Direção de paridade definida pelo responsável: **Windows → WSL2 → Docker → PostgreSQL 18 → GastroHub**, reduzindo diferenças entre desenvolvimento, CI, staging e produção.
+
+Opções que foram avaliadas:
 
 | Opção | Como | Prós | Contras |
 |---|---|---|---|
