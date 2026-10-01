@@ -1,6 +1,7 @@
 // Configuração ESLint base (flat config) compartilhada pelo monorepo.
 import js from '@eslint/js';
 import prettier from 'eslint-config-prettier';
+import reactHooks from 'eslint-plugin-react-hooks';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
@@ -22,6 +23,14 @@ export default tseslint.config(
       // Sem consistent-type-imports: o autofix converteria em `import type` classes
       // usadas pela injeção de dependência do NestJS, quebrando a DI em runtime.
       'no-console': ['error', { allow: ['warn', 'error'] }],
+    },
+  },
+  {
+    // Frontend: código de navegador com React.
+    files: ['apps/web/src/**/*.{ts,tsx}'],
+    ...reactHooks.configs.flat.recommended,
+    languageOptions: {
+      globals: { ...globals.browser },
     },
   },
   {
