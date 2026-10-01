@@ -1,7 +1,8 @@
 # ADR-001 — Monólito modular
 
-- Status: Proposto
+- Status: Aceito
 - Data: 2026-10-01
+- Aceito em: 2026-10-01, pelo responsável do projeto (com todos os pontos detalhados abaixo)
 
 ## Contexto
 

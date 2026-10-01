@@ -6,9 +6,16 @@ Formato: `[módulo-alvo] descrição: origem/motivo`.
 
 ## Plataforma / técnico
 
-- [M01] Verificação automática de fronteiras entre módulos (dependency-cruiser ou regras de import do ESLint): ADR-001.
-- [M01] Varredura de segredos (gitleaks) e auditoria de dependências no CI.
-- [M01] `.env.example` e validação de configuração com zod na inicialização.
+- ~~[M01] Verificação automática de fronteiras entre módulos~~: entregue no M01 (dependency-cruiser).
+- ~~[M01] Varredura de segredos (gitleaks) e auditoria de dependências no CI~~: entregue no M01.
+- ~~[M01] `.env.example` e validação de configuração com zod na inicialização~~: entregue no M01.
+- [Deploy] Mecanismo de migrations em produção (imagem/job dedicado como `gastrohub_owner`); a imagem atual da API não inclui migrations: M01.
+- [Técnico] Migrar para TypeScript 7 (compilador nativo) quando typescript-eslint, Nest CLI e drizzle-kit suportarem: M01 fixou 6.0.x.
+- [Técnico] Aviso moderado do `pnpm audit`: esbuild ≤ 0.24 via `drizzle-kit` (apenas ferramenta de desenvolvimento, fora da imagem de produção). Atualizar quando o drizzle-kit trocar a dependência: M01.
+- [Técnico] Cache do store do pnpm no CI para acelerar instalações: M01.
+- [Técnico] Dependabot/Renovate para atualização de dependências e imagens Docker: M01.
+- [Técnico] Code splitting no frontend quando houver telas reais (bundle inicial ~430 kB): M01.
+- [Técnico] Proteção da branch `main` no GitHub exigindo CI verde (configuração do responsável): M01.
 - [Futuro] OpenTelemetry (traces e métricas) quando houver ambiente de produção.
 - [Futuro] Fila de jobs (pg-boss ou Redis + BullMQ) quando houver trabalho assíncrono.
 - [Futuro] Turborepo/Nx se o tempo de build do monorepo justificar.

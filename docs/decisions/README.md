@@ -6,10 +6,10 @@ Decisões arquiteturais relevantes do GastroHub. Uma decisão aceita não é edi
 
 | ADR | Título | Status |
 |---|---|---|
-| [ADR-001](ADR-001-monolito-modular.md) | Monólito modular | Proposto |
-| [ADR-002](ADR-002-stack.md) | Stack tecnológica | Proposto |
-| [ADR-003](ADR-003-multi-tenancy.md) | Multi-tenancy com schema compartilhado + RLS | Proposto |
-| [ADR-004](ADR-004-autenticacao.md) | Autenticação por sessões opacas | Proposto |
+| [ADR-001](ADR-001-monolito-modular.md) | Monólito modular | Aceito (2026-10-01) |
+| [ADR-002](ADR-002-stack.md) | Stack tecnológica | Aceito (2026-10-01) |
+| [ADR-003](ADR-003-multi-tenancy.md) | Multi-tenancy com schema compartilhado + RLS | Aceito (2026-10-01) |
+| [ADR-004](ADR-004-autenticacao.md) | Autenticação por sessões opacas | Aceito (2026-10-01) |
 
 Status possíveis: `Proposto`, `Aceito`, `Rejeitado`, `Substituído por ADR-NNN`.
 

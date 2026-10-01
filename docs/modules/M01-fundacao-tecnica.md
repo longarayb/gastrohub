@@ -1,7 +1,7 @@
 # M01 — Fundação Técnica
 
-- Status: **Rascunho, aguardando aprovação do responsável**
-- Data: 2026-10-01
+- Status: **Implementado na branch `feat/m01-fundacao-tecnica`, aguardando aprovação do responsável para merge**
+- Data: 2026-10-01 (especificação aprovada com os ajustes da seção 18; implementação no mesmo dia)
 - Dependências: nenhuma (primeiro módulo)
 - ADRs: [ADR-001](../decisions/ADR-001-monolito-modular.md), [ADR-002](../decisions/ADR-002-stack.md), [ADR-003](../decisions/ADR-003-multi-tenancy.md)
 
@@ -305,9 +305,49 @@ docker compose down -v        # APAGA o volume do banco de dev
 
 Cada passo vira um ou mais commits em Conventional Commits. Push somente com autorização.
 
-## 18. Pontos para revisão do responsável
+## 18. Decisões do responsável (2026-10-01)
 
-1. **Modo de desenvolvimento:** API e web no host (`pnpm dev`) com o banco no Docker (recomendado), ou tudo em containers no dia a dia.
-2. **`gastrohub_test`:** banco separado no mesmo container (recomendado, mais simples) ou um container dedicado em outra porta com `tmpfs` (mais isolado e rápido, porém mais um serviço).
-3. **Senhas geradas automaticamente** pelo `pnpm env:init`, ou definidas manualmente.
-4. **Itens dos ADRs ainda não aprovados explicitamente** usados nesta especificação: adapter Fastify, Tailwind, React Router/TanStack Query, Vitest, ESLint/Prettier e pnpm (ver relatório do ambiente).
+1. **Desenvolvimento:** API e web no host (`pnpm dev`), PostgreSQL no Docker. Profile `app` mantido para validar a stack containerizada.
+2. **`gastrohub_test`:** banco separado no mesmo container; sem segundo container. Proteção do sufixo `_test` obrigatória.
+3. **Senhas:** geradas por `pnpm env:init`; nunca impressas, registradas ou versionadas; `.env` existente só é sobrescrito com confirmação.
+4. **ADRs 001 a 004 aceitos**, incluindo NestJS + Fastify, Tailwind, React Router, TanStack Query, Vitest, ESLint + Prettier e pnpm workspaces.
+5. **Regra de banco:** `gastrohub_owner` para migrations/DDL; `gastrohub_app` sem nenhum privilégio de DDL, com validação explícita após bootstrap e migrations.
+6. **Regra de domínio:** nenhuma tabela ou regra de negócio no M01.
+
+## 19. Registro de implementação
+
+Diferenças em relação ao texto original desta especificação, todas sem impacto arquitetural:
+
+| Item | Especificado | Implementado | Motivo |
+|---|---|---|---|
+| Init do container | `10-databases.sql`, `20-roles.sh`, `30-grants.sql` | `10-roles.sql`, `20-databases.sql`, `21-privileges.psql` | Os papéis precisam existir antes dos bancos (owner); as senhas são lidas com `\getenv` do psql, sem script shell |
+| Privilégios do runtime | DML via default privileges | DML via default privileges **e** sem `TEMPORARY` no banco | Regra 2 do responsável: nenhum privilégio de DDL desnecessário |
+| Formato da API | (não especificado) | Pacote **ESM** | NestJS 12 é distribuído somente em ESM |
+| TypeScript | strict | strict, versão **6.0.x** | typescript-eslint suporta `< 6.1`; o TypeScript 7 ainda não tem a API JS usada pelas ferramentas |
+| Configs compartilhadas | `packages/config` com tsconfig, ESLint e Prettier | `packages/config` com ESLint e Prettier; `tsconfig.base.json` na raiz | Padrão do TypeScript para `extends` em monorepo |
+| Variáveis | conforme §13 | + `API_HOST` (padrão `127.0.0.1`) | A API não fica exposta na rede local em desenvolvimento; containers usam `0.0.0.0` |
+| `db:validate` | `psql` com `99-validate.sql` | `scripts/db-validate.mjs` (stdin em UTF-8) | O pipe do PowerShell 5.1 corrompia caracteres acentuados |
+| Profile `app` | API e web em containers | Web em `127.0.0.1:8080`; API **não publicada** no host (acesso via nginx) | Menor superfície exposta; sem conflito com o fluxo de dev (3000/5173) |
+| ESLint | ESLint + Prettier | + `eslint-plugin-react-hooks` no frontend | Regras de hooks do React evitam erros reais de uso |
+| Scripts de instalação | (não especificado) | `allowBuilds`: nega `@scarf/scarf` (telemetria); permite `@swc/core` e `esbuild` | O pnpm 12 bloqueia scripts de instalação por padrão |
+| Migrations na imagem da API | (não especificado) | Não incluídas | O mecanismo de migração em produção será definido no ADR de deploy ([backlog](../backlog.md)) |
+| Request id | `X-Request-Id` ou UUIDv7 | Gerado pelo Fastify; valor do cliente aceito só se seguro (`[A-Za-z0-9._-]{1,128}`) | Evita log injection |
+
+### Critérios de aceite (§15): resultado
+
+| Critério | Resultado |
+|---|---|
+| Serviço nativo parado, início manual, não desinstalado | ✅ `Stopped` / `Manual` |
+| `docker compose up -d` → PostgreSQL 18 saudável na 5432 | ✅ `postgres:18.6`, healthcheck `healthy` |
+| `99-validate.sql` no container | ✅ ICU `pt-BR`, UTF8, owner `gastrohub_owner`, runtime sem SUPERUSER/BYPASSRLS, sem tabelas de negócio |
+| `gastrohub_test` isolado; testes recusam banco sem `_test` | ✅ testado (runner e script de migração) |
+| `pnpm install`, `env:init`, `db:migrate`, `dev` | ✅ executados nesta máquina. O teste em máquina limpa será feito pelo CI no primeiro push |
+| `/health/live` 200; `/health/ready` 200 e 503 | ✅ testes de integração |
+| API recusa SUPERUSER e BYPASSRLS (com teste) | ✅ testes de integração |
+| Página de status mostra API e banco ok | ✅ via proxy do Vite e via nginx |
+| Lint, typecheck, testes e build locais | ✅ |
+| Lint, typecheck, testes e build no CI | ⏳ workflow validado com actionlint; execução real só após o push |
+| `docker compose --profile app up -d --build` | ✅ API e web `healthy` |
+| Nenhum segredo versionado | ✅ gitleaks no histórico: sem vazamentos |
+| Nenhuma tabela de negócio | ✅ apenas `drizzle.__drizzle_migrations` |
+| README, `05-DEPLOY` e CHANGELOG atualizados | ✅ |
