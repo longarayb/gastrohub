@@ -59,6 +59,8 @@ export class DatabaseModule implements OnModuleInit, OnApplicationShutdown {
   }
 
   async onApplicationShutdown(): Promise<void> {
-    await this.pool.end();
+    if (!this.pool.ended) {
+      await this.pool.end();
+    }
   }
 }

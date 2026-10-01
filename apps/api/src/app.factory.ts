@@ -45,7 +45,8 @@ export async function createApp(config: AppConfig): Promise<NestFastifyApplicati
       genReqId: (req: IncomingMessage | Http2ServerRequest) =>
         resolveRequestId(req.headers[REQUEST_ID_HEADER]),
     }),
-    { bufferLogs: true },
+    // abortOnError: false → falhas de inicialização chegam ao chamador (main.ts encerra com código 1).
+    { bufferLogs: true, abortOnError: false },
   );
   app.useLogger(app.get(Logger));
   app.enableShutdownHooks();
