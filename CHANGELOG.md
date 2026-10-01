@@ -16,4 +16,6 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ### Alterado
 
-- Ambiente local passa a usar PostgreSQL 18.6 nativo em `localhost:5432` (banco `gastrohub`). Docker deixa de ser pré-requisito local, e os testes locais usarão o banco `gastrohub_test`.
+- Ambiente local passa a usar PostgreSQL 18.6 nativo em `localhost:5432` (banco `gastrohub`), e os testes locais usarão o banco `gastrohub_test`.
+- Decisão: banco `gastrohub` recriado com ICU `pt-BR`, UTF8 e `template0`. Adicionado `infra/database/99-validate.sql`.
+- Node.js 24 LTS e Docker Desktop instalados. A estratégia do banco local (nativo vs. Docker) fica em aberto para o M01, com preferência por Docker.

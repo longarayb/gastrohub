@@ -1,5 +1,6 @@
 -- =====================================================================
--- GastroHub — (OPCIONAL, recomendado) recriar o banco com collation ICU
+-- GastroHub — recriar o banco com collation ICU pt-BR
+-- Decisão do responsável do projeto em 2026-10-01: RECRIAR com ICU.
 --
 -- O banco foi criado com LC_COLLATE/LC_CTYPE = 'Portuguese_Brazil.1252'.
 -- Esse nome de locale existe somente no Windows:

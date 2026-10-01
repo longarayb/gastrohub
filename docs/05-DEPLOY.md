@@ -1,16 +1,16 @@
 # 05 — Ambientes, Docker e Deploy
 
-> Status: **proposta**. Banco local definido (PostgreSQL 18 nativo). CI será entregue no **M01 — Fundação técnica**.
+> Status: **proposta**. Banco local atual: PostgreSQL 18 nativo. A estratégia definitiva do banco local (nativo vs. Docker) será fechada no **M01 — Fundação técnica**, com preferência do responsável por Docker.
 
-## 1. Avaliação do Docker (bootstrap)
+## 1. Avaliação do Docker
 
-- Ainda não há aplicação para conteinerizar.
-- Docker **não está instalado** na máquina de desenvolvimento atual (verificado em 2026-10-01).
-- Por isso, nenhum `docker-compose.yml` foi criado nesta etapa: um arquivo que não pode ser validado não deve ser versionado.
+- Ainda não há aplicação para conteinerizar, então nenhum `docker-compose.yml` foi criado: um arquivo que não pode ser validado não deve ser versionado.
+- Docker Desktop 4.93 (CLI 29.8.1, Compose v5.5.1) instalado em 2026-10-01.
+- **Pendente:** o engine do Docker depende do **WSL2**, que não está instalado. No Windows 11 Home não existe backend Hyper-V, então o WSL2 é obrigatório. A instalação (`wsl --install`) exige administrador e reinicialização.
 
-## 2. Banco de dados local (definido em 2026-10-01)
+## 2. Banco de dados local (estado em 2026-10-01)
 
-O ambiente local usa um **PostgreSQL 18 nativo no Windows**, não um container:
+Hoje o ambiente local usa um **PostgreSQL 18 nativo no Windows**:
 
 | Item | Valor |
 |---|---|
@@ -22,9 +22,10 @@ O ambiente local usa um **PostgreSQL 18 nativo no Windows**, não um container:
 
 Preparação, executada uma vez pelo responsável (scripts em `infra/database/`):
 
-1. *(Opcional, recomendado, só com o banco vazio)* `00-recreate-database-icu.sql`: recria o banco com collation ICU `pt-BR`, portável entre Windows e Linux.
+1. `00-recreate-database-icu.sql`: recria o banco com ICU `pt-BR` (decisão de 2026-10-01; ver [02-BANCO-DE-DADOS](02-BANCO-DE-DADOS.md) §2).
 2. `01-roles.sql`: cria `gastrohub_owner` (migrations) e `gastrohub_app` (runtime, sujeito a RLS) e transfere a propriedade do banco.
 3. Definir as senhas com `\password` no psql e colocá-las **somente** no `.env` local.
+4. `99-validate.sql`: confere versão, provider, locale, encoding, owner e papéis.
 
 **A aplicação nunca conecta como `postgres`.** Superusuários ignoram Row-Level Security, o que anularia o isolamento entre empresas ([ADR-003](decisions/ADR-003-multi-tenancy.md)).
 
@@ -37,9 +38,21 @@ DATABASE_MIGRATION_URL=postgres://gastrohub_owner:<senha>@localhost:5432/gastroh
 
 Testes de integração locais usarão um banco separado (`gastrohub_test`), criado no M01, para nunca apagar dados do banco de desenvolvimento.
 
-## 3. Docker Compose (opcional localmente)
+### Decisão em aberto para o M01: PostgreSQL nativo vs. Docker
 
-Com o PostgreSQL nativo, o Docker **deixa de ser pré-requisito** para desenvolver: `api` e `web` rodam com `pnpm dev`. O Compose continua útil para conteinerizar `api` e `web` (paridade com produção) e para serviços auxiliares:
+O responsável indicou **preferência por PostgreSQL via Docker**. Como o serviço nativo já ocupa `localhost:5432`, as opções são:
+
+| Opção | Como | Prós | Contras |
+|---|---|---|---|
+| A. Docker em outra porta | Container `postgres:18` em `localhost:5433`, nativo continua | Sem conflito; paridade com CI/produção | Dois PostgreSQL na máquina; `DATABASE_URL` muda de porta |
+| B. Docker na 5432, nativo desativado | Serviço `postgresql-x64-18` em início manual/parado | Mantém `localhost:5432` | Banco nativo deixa de ser o usado |
+| C. Manter nativo | Sem container de banco | Já funciona; nada a instalar | Menor paridade com Linux; setup manual por desenvolvedor |
+
+Em qualquer opção, o banco é criado com os mesmos parâmetros (ICU `pt-BR`, UTF8, `template0`) e os mesmos scripts de `infra/database/`.
+
+## 3. Docker Compose
+
+O Compose (a definir no M01) atenderá a conteinerização de `api` e `web` (paridade com produção), serviços auxiliares e, conforme a decisão acima, o `postgres`:
 
 | Serviço | Imagem | Necessidade | Quando entra |
 |---|---|---|---|
@@ -51,7 +64,7 @@ Com o PostgreSQL nativo, o Docker **deixa de ser pré-requisito** para desenvolv
 
 Requisitos do compose (quando existir):
 
-- Se um container `postgres` for adicionado no futuro: usar os mesmos scripts de `infra/database/` como init e um volume nomeado.
+- Se houver container `postgres`: imagem `postgres:18`, `POSTGRES_INITDB_ARGS` com ICU `pt-BR`, scripts de `infra/database/` como init, volume nomeado e `healthcheck`.
 - Variáveis lidas de `.env` (não versionado), com `.env.example` versionado.
 
 ## 4. Ambientes

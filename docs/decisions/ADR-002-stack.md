@@ -60,6 +60,6 @@ Escolher linguagem, frameworks, banco, ORM e ferramentas de teste que sejam prod
 ## Consequências
 
 - Node.js LTS e pnpm passam a ser pré-requisitos (ainda não instalados na máquina atual).
-- *Atualização 2026-10-01:* o desenvolvimento local usa PostgreSQL 18.6 **nativo** (`localhost:5432`). Testes de integração locais rodam contra um banco dedicado `gastrohub_test` em vez de Testcontainers, e o CI usa um service container PostgreSQL 18. Assim, Docker deixa de ser pré-requisito local.
+- *Atualização 2026-10-01:* o desenvolvimento local usa PostgreSQL 18.6 **nativo** (`localhost:5432`). Testes de integração locais rodam contra um banco dedicado `gastrohub_test`, e o CI usa um service container PostgreSQL 18. Docker Desktop foi instalado; o responsável prefere o PostgreSQL via Docker, e a estratégia final do banco local será decidida no M01 ([05-DEPLOY](../05-DEPLOY.md) §2).
 - Versões exatas serão fixadas no M01 (`engines`, `packageManager`, tags de imagem Docker).
 - A escolha de ORM é a de maior risco de troca futura. Mitigação: acesso a dados isolado na camada `infrastructure/` de cada módulo.
