@@ -1,0 +1,27 @@
+-- Incluído por 20-databases.sql com a variável :db definida.
+-- Extensão .psql para o entrypoint não executá-lo diretamente.
+
+\connect :db
+
+-- Ninguém além dos papéis do GastroHub conecta.
+REVOKE ALL ON DATABASE :"db" FROM PUBLIC;
+GRANT CONNECT, CREATE, TEMPORARY ON DATABASE :"db" TO gastrohub_owner;
+-- Runtime: apenas CONNECT (sem CREATE de schema e sem tabelas temporárias).
+GRANT CONNECT ON DATABASE :"db" TO gastrohub_app;
+
+-- O schema public pertence a pg_database_owner (= gastrohub_owner).
+REVOKE ALL ON SCHEMA public FROM PUBLIC;
+GRANT USAGE ON SCHEMA public TO gastrohub_app;
+
+-- Tudo o que gastrohub_owner criar via migrations fica acessível ao
+-- runtime somente para DML. Sem TRUNCATE, REFERENCES ou TRIGGER.
+ALTER DEFAULT PRIVILEGES FOR ROLE gastrohub_owner IN SCHEMA public
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO gastrohub_app;
+ALTER DEFAULT PRIVILEGES FOR ROLE gastrohub_owner IN SCHEMA public
+  GRANT USAGE, SELECT ON SEQUENCES TO gastrohub_app;
+ALTER DEFAULT PRIVILEGES FOR ROLE gastrohub_owner IN SCHEMA public
+  GRANT EXECUTE ON FUNCTIONS TO gastrohub_app;
+
+-- Funções criadas não ficam executáveis por PUBLIC por padrão.
+ALTER DEFAULT PRIVILEGES FOR ROLE gastrohub_owner
+  REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;

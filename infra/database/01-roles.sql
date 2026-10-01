@@ -29,7 +29,9 @@ CREATE ROLE gastrohub_app LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
 ALTER DATABASE gastrohub OWNER TO gastrohub_owner;
 
 REVOKE ALL ON DATABASE gastrohub FROM PUBLIC;
-GRANT CONNECT, TEMPORARY ON DATABASE gastrohub TO gastrohub_owner, gastrohub_app;
+GRANT CONNECT, CREATE, TEMPORARY ON DATABASE gastrohub TO gastrohub_owner;
+-- Runtime: apenas CONNECT (sem CREATE de schema e sem tabelas temporárias).
+GRANT CONNECT ON DATABASE gastrohub TO gastrohub_app;
 
 REVOKE ALL ON SCHEMA public FROM PUBLIC;
 GRANT USAGE ON SCHEMA public TO gastrohub_app;
