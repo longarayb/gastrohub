@@ -18,14 +18,14 @@ services:
       GASTROHUB_APP_PASSWORD: ${GASTROHUB_APP_PASSWORD:?defina GASTROHUB_APP_PASSWORD no .env}
     ports:
       # Somente na interface local: o banco não fica exposto na rede.
-      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+      - '127.0.0.1:${POSTGRES_PORT:-5432}:5432'
     volumes:
       - gastrohub_pgdata:/var/lib/postgresql
       - ./infra/database/docker-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       # Via TCP: durante o init o servidor temporário só escuta no socket local,
       # então o container só fica "healthy" depois que o init terminar.
-      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d gastrohub"]
+      test: ['CMD-SHELL', 'pg_isready -h 127.0.0.1 -U postgres -d gastrohub']
       interval: 5s
       timeout: 5s
       retries: 20
