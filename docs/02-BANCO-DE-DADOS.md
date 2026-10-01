@@ -63,6 +63,8 @@ PostgreSQL 18.6 nativo em `localhost:5432`, banco `gastrohub`. As tabelas são c
 | Template | `template0` (criação limpa) |
 | Owner | `gastrohub_owner` (após [`01-roles.sql`](../infra/database/01-roles.sql)) |
 
+**Validado em 2026-10-01** (PostgreSQL 18.6 nativo, `99-validate.sql`): provider `icu`, locale `pt-BR`, `UTF8`, owner `gastrohub_owner`, `gastrohub_app` e `gastrohub_owner` com `rolsuper = f` e `rolbypassrls = f`, 0 tabelas, ordenação pt-BR correta (a, á, b, ç, d, É, z). Os papéis no banco nativo **não têm senha** (login desabilitado), porque o banco oficial será o container (M01).
+
 Motivo: ordenação, índices e dumps idênticos em Windows, CI e produção (Linux). A configuração efetiva é verificada com [`99-validate.sql`](../infra/database/99-validate.sql). Toda nova instância (container, CI, produção) deve ser criada com os mesmos parâmetros.
 
 Rotinas que realmente precisam cruzar empresas (ex.: login, que busca o usuário pelo e-mail antes de existir tenant; tarefas de plataforma) usam caminhos explícitos e auditados, nunca o papel da aplicação com RLS desligado.
