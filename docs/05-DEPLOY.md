@@ -6,7 +6,9 @@
 
 - Ainda não há aplicação para conteinerizar, então nenhum `docker-compose.yml` foi criado: um arquivo que não pode ser validado não deve ser versionado.
 - Docker Desktop 4.93 (CLI 29.8.1, Compose v5.5.1) instalado em 2026-10-01.
-- **Pendente:** o engine do Docker depende do **WSL2**, que não está instalado. No Windows 11 Home não existe backend Hyper-V, então o WSL2 é obrigatório. A instalação (`wsl --install`) exige administrador e reinicialização.
+- WSL2 instalado em 2026-10-01 (WSL 3.0.1, kernel 6.18.40.1). No Windows 11 Home o WSL2 é obrigatório, porque não existe backend Hyper-V.
+- **Docker Engine validado** após a reinicialização: Server 29.8.1 (`linux/amd64`, backend WSL2, distro `docker-desktop`); `docker run --rm hello-world` → exit 0.
+- Porta 5432 ainda ocupada pelo serviço nativo `postgresql-x64-18` (Running/Automatic). A troca para o container acontece no M01 (decisão B, §2).
 
 ## 2. Banco de dados local (estado em 2026-10-01)
 
