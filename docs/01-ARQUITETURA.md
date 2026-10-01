@@ -6,7 +6,7 @@
 
 - Repositório novo: diretório local e GitHub vazios.
 - Ainda não há stack, código, banco, Docker, testes ou CI.
-- Ferramentas na máquina de desenvolvimento: Git instalado neste bootstrap. **Node.js e Docker ainda não estão instalados** e serão necessários no M01.
+- Ferramentas na máquina de desenvolvimento: Git (instalado neste bootstrap) e PostgreSQL 18.6 nativo (`localhost:5432`, banco `gastrohub`). **Node.js ainda não está instalado** e será necessário no M01. Docker é opcional.
 
 ## 2. Estilo arquitetural: monólito modular
 
@@ -72,9 +72,9 @@ C:\GastroHub
 │   ├── contracts/           # schemas zod e tipos compartilhados API ↔ web
 │   └── config/              # tsconfig / eslint / prettier compartilhados
 ├── infra/
-│   └── docker/              # Dockerfiles e scripts de init do banco
+│   ├── database/            # scripts SQL de preparação (papéis, collation)
+│   └── docker/              # Dockerfiles (quando houver deploy)
 ├── docs/
-├── docker-compose.yml
 ├── .env.example
 ├── package.json
 └── pnpm-workspace.yaml
@@ -96,10 +96,11 @@ Monorepo com **pnpm workspaces**. Turborepo/Nx ficam fora até que o tempo de bu
 | Validação | zod (compartilhado em `packages/contracts`) | Um único schema para front e back |
 | Auth | Sessões opacas próprias + Argon2id | Revogáveis e simples (ADR-004) |
 | Logs | pino (JSON estruturado) | Rápido; correlação por `request_id` |
-| Testes | Vitest, Supertest e Testcontainers (PostgreSQL); Playwright (e2e, depois) | Integração contra banco real, inclusive RLS |
+| Testes | Vitest e Supertest contra PostgreSQL real (`gastrohub_test` local, service container no CI); Playwright (e2e, depois) | Integração contra banco real, inclusive RLS |
 | Lint/format | ESLint + Prettier | Padrão de mercado e integração com NestJS |
 | Docs de API | OpenAPI 3 (gerado pelo NestJS) | Contrato navegável e testável |
-| Contêineres | Docker + Docker Compose | Ambiente local reproduzível |
+| Banco local | PostgreSQL 18 nativo + scripts em `infra/database/` | Já instalado; reproduzível via scripts |
+| Contêineres | Docker (imagens de deploy; opcional localmente) | Paridade com produção |
 | CI | GitHub Actions | Repositório já está no GitHub |
 
 Prós, contras e alternativas de cada escolha estão no [ADR-002](decisions/ADR-002-stack.md).

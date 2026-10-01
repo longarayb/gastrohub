@@ -46,6 +46,14 @@ Sem `app.company_id` definido, `current_setting(..., true)` retorna `NULL` e **n
 | `gastrohub_app` | Conexão da API em runtime | DML apenas; **sem** `BYPASSRLS`, **sem** ser dono das tabelas |
 | `gastrohub_readonly` | Relatórios/suporte (futuro) | SELECT com RLS |
 
+> **Atenção:** superusuários (ex.: `postgres`) e donos das tabelas **sempre ignoram RLS**, mesmo com `FORCE`. Por isso a aplicação conecta exclusivamente como `gastrohub_app`. Os papéis são criados por [`infra/database/01-roles.sql`](../infra/database/01-roles.sql).
+
+### Ambiente local
+
+PostgreSQL 18.6 nativo em `localhost:5432`, banco `gastrohub`. As tabelas são criadas pela aplicação via migrations. Detalhes em [05-DEPLOY](05-DEPLOY.md) §2.
+
+**Collation:** o banco foi criado com `Portuguese_Brazil.1252`, um locale que só existe no Windows. A recomendação é recriá-lo, enquanto está vazio, com ICU `pt-BR` ([`infra/database/00-recreate-database-icu.sql`](../infra/database/00-recreate-database-icu.sql)), para que ordenação, índices e dumps sejam idênticos em Windows, CI e produção.
+
 Rotinas que realmente precisam cruzar empresas (ex.: login, que busca o usuário pelo e-mail antes de existir tenant; tarefas de plataforma) usam caminhos explícitos e auditados, nunca o papel da aplicação com RLS desligado.
 
 ## 3. Modelo de fundação (M02–M04)

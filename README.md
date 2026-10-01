@@ -38,11 +38,12 @@ Plataforma modular de gestão para food service: restaurantes e hamburguerias no
 
 - Git
 - Node.js LTS + pnpm (via Corepack)
-- Docker Desktop (com Docker Compose v2)
+- PostgreSQL 18 local em `localhost:5432`, banco `gastrohub`, preparado com os scripts de [infra/database/](infra/database/)
+- Docker Desktop: opcional
 
 ## Execução local
 
-Ainda não se aplica. O ambiente local (`docker compose up -d`) será entregue no módulo **M01 — Fundação técnica**. Veja [docs/05-DEPLOY.md](docs/05-DEPLOY.md).
+Ainda não se aplica. A aplicação (que criará as tabelas via migrations) será entregue no módulo **M01 — Fundação técnica**. Veja [docs/05-DEPLOY.md](docs/05-DEPLOY.md).
 
 ## Fluxo de trabalho
 
