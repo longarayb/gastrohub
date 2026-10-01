@@ -1,0 +1,23 @@
+# Segredos nunca entram no contexto de build
+.env
+.env.*
+!.env.example
+**/*.pem
+**/*.key
+
+# Dependências e artefatos locais (reconstruídos dentro da imagem)
+**/node_modules
+**/dist
+**/coverage
+**/.vite
+**/*.tsbuildinfo
+
+# Irrelevantes para as imagens
+.git
+.github
+.vscode
+.idea
+.claude
+docs
+**/*.md
+infra/database
