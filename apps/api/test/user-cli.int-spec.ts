@@ -71,6 +71,16 @@ describe('CLI de usuários', () => {
     expect((await new BrowserClient(app).login(email, STRONG_PASSWORD)).status).toBe(200);
   });
 
+  it('--password-stdin ignora BOM inicial e CRLF final (pipe do PowerShell 5.1)', async () => {
+    const email = uniqueEmail('cli');
+    const result = await cli(
+      ['create', '--email', email, '--name', 'BOM', '--password-stdin'],
+      `﻿${STRONG_PASSWORD}\r\n`,
+    );
+    expect(result.code).toBe(0);
+    expect((await new BrowserClient(app).login(email, STRONG_PASSWORD)).status).toBe(200);
+  });
+
   it('create: aplica a política de senha e recusa duplicado', async () => {
     const email = uniqueEmail('cli');
     const weak = await cli(

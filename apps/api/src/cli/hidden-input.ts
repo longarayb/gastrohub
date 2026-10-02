@@ -34,12 +34,16 @@ export async function promptHidden(io: CliIo, question: string): Promise<string>
   }
 }
 
-/** Lê todo o stdin (modo --password-stdin), removendo só a quebra de linha final. */
+/**
+ * Lê todo o stdin (modo --password-stdin), removendo só a quebra de linha final e um BOM
+ * inicial (o PowerShell 5.1 prefixa o pipe com BOM UTF-8; nunca faz parte da senha).
+ */
 export async function readAllStdin(io: CliIo): Promise<string> {
   const chunks: Buffer[] = [];
   for await (const chunk of io.stdin) chunks.push(Buffer.from(chunk as Buffer));
   return Buffer.concat(chunks)
     .toString('utf8')
+    .replace(/^﻿/, '')
     .replace(/\r?\n$/, '');
 }
 
