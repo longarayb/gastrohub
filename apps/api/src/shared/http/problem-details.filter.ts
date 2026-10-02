@@ -9,6 +9,8 @@ import {
 } from '@nestjs/common';
 import { type FastifyReply, type FastifyRequest } from 'fastify';
 
+import { ApiException } from './api-exception.js';
+
 const TITLES: Partial<Record<number, string>> = {
   400: 'Requisição inválida',
   401: 'Não autenticado',
@@ -16,6 +18,8 @@ const TITLES: Partial<Record<number, string>> = {
   404: 'Recurso não encontrado',
   405: 'Método não permitido',
   409: 'Conflito',
+  413: 'Conteúdo muito grande',
+  415: 'Tipo de conteúdo não suportado',
   422: 'Regra de negócio violada',
   429: 'Muitas requisições',
   500: 'Erro interno',
@@ -43,6 +47,9 @@ export class ProblemDetailsFilter implements ExceptionFilter {
       );
     }
 
+    if (exception instanceof ApiException && exception.headers) {
+      void reply.headers(exception.headers);
+    }
     void reply
       .status(problem.status)
       .header('content-type', PROBLEM_DETAILS_CONTENT_TYPE)
@@ -51,8 +58,7 @@ export class ProblemDetailsFilter implements ExceptionFilter {
 }
 
 export function toProblemDetails(exception: unknown, request: FastifyRequest): ProblemDetails {
-  const status =
-    exception instanceof HttpException ? exception.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;
+  const status = statusOf(exception);
   const title = TITLES[status] ?? (status >= 500 ? 'Erro interno' : 'Erro na requisição');
 
   // Mensagens de HttpException são escritas pela aplicação e podem ser expostas (4xx e 503).
@@ -63,6 +69,14 @@ export function toProblemDetails(exception: unknown, request: FastifyRequest): P
       ? httpExceptionMessage(exception)
       : undefined;
 
+  const extra =
+    exception instanceof ApiException
+      ? {
+          code: exception.code,
+          ...(exception.errors?.length ? { errors: exception.errors } : {}),
+        }
+      : {};
+
   return {
     type: 'about:blank',
     title,
@@ -70,10 +84,22 @@ export function toProblemDetails(exception: unknown, request: FastifyRequest): P
     ...(detail ? { detail } : {}),
     instance: request.url.split('?')[0] ?? request.url,
     ...(request.id ? { requestId: request.id } : {}),
+    ...extra,
   };
 }
 
+/** HttpException do Nest, erros do próprio Fastify (ex.: 415) ou 500 para o resto. */
+function statusOf(exception: unknown): number {
+  if (exception instanceof HttpException) return exception.getStatus();
+  const fastifyStatus = (exception as { statusCode?: unknown } | null)?.statusCode;
+  if (typeof fastifyStatus === 'number' && fastifyStatus >= 400 && fastifyStatus < 500) {
+    return fastifyStatus;
+  }
+  return HttpStatus.INTERNAL_SERVER_ERROR;
+}
+
 function httpExceptionMessage(exception: HttpException): string | undefined {
+  if (exception instanceof ApiException) return exception.detail;
   const response = exception.getResponse();
   if (typeof response === 'string') return response;
   if (response && typeof response === 'object' && 'message' in response) {
