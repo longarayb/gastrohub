@@ -819,6 +819,7 @@ Branch `feat/m02-autenticacao`; commits pequenos; PR para `main`; merge só com 
 | `bytea` | `bytea` | `customType` do Drizzle | O drizzle-orm 0.45 não tem o tipo nativo |
 | JSON obrigatório (§9.4) | Corpo apenas `application/json` | Parser `text/plain` removido **e** parsers do Nest desligados (`bodyParser: false`) | Os testes mostraram que o Nest registrava um parser de formulário (`x-www-form-urlencoded`); agora formulários recebem 415 |
 | `TRUST_PROXY` (§9.5) | Número de proxies | Função equivalente (`hop < N`) | A tipagem do `FastifyAdapter` do NestJS 12 não aceita `number` |
+| nginx do profile `app` (D11) | API confia no nginx | `nginx.conf` passou a **sobrescrever** `X-Forwarded-For` com `$remote_addr` | O nginx do M01 não enviava o cabeçalho: todos os clientes pareciam o próprio nginx, e os limites por IP seriam compartilhados. Verificado também que um `X-Forwarded-For` forjado pelo cliente é ignorado |
 | Limite global (§9.5) | 429 genérico | `ApiException` (Problem Details com `code` e `Retry-After`) | Mesmo formato dos demais 429 |
 | `env:init` (§12) | Documentar como acrescentar `AUTH_SECRET` | `pnpm env:init -- --add-missing` acrescenta só as variáveis ausentes, sem exibir segredos | Evita regenerar as senhas do banco e evita segredo no terminal |
 | `--password-stdin` | Lê a senha do stdin | Remove um BOM UTF-8 inicial | O PowerShell 5.1 prefixa o pipe com BOM (descoberto no teste de fumaça real) |
