@@ -1,6 +1,6 @@
 # 04 — API
 
-> Status: **convenções propostas**. Ainda não existem endpoints.
+> Status: **convenções em uso**. Endpoints existentes: infraestrutura (M01) e autenticação (M02, §10).
 
 ## 1. Estilo
 
@@ -48,6 +48,8 @@ Erros comuns: 400 (validação), 401 (não autenticado), 403 (sem permissão), 4
 
 Nunca expor stack trace, SQL ou detalhes internos.
 
+Membro de extensão **`code`** (M02, D14): string estável para o frontend tratar o erro sem depender do texto (ex.: `validation_failed`, `invalid_credentials`, `session_expired`, `session_revoked`, `csrf_failed`, `origin_not_allowed`, `rate_limited`). Respostas 429 trazem o cabeçalho `Retry-After`.
+
 ## 5. Paginação, filtros e ordenação
 
 - Paginação por **cursor** em listas operacionais grandes (pedidos, movimentações): `?limit=50&cursor=…` → `{ "data": [...], "nextCursor": "…" }`.
@@ -69,7 +71,8 @@ Nunca expor stack trace, SQL ou detalhes internos.
 
 ## 8. Autenticação da API
 
-- Interface web: cookie de sessão + proteção CSRF ([03-SEGURANCA](03-SEGURANCA.md)).
+- Interface web: cookie de sessão + proteção CSRF ([03-SEGURANCA](03-SEGURANCA.md)). Toda rota exige sessão por padrão (guard global); rotas públicas são marcadas com `@Public()`.
+- Métodos mutáveis exigem `Origin` permitida (ou `Sec-Fetch-Site: same-origin`) e corpo `application/json`; em rotas autenticadas, também `X-CSRF-Token`.
 - **API pública e integrações** (módulo futuro): chaves de API por empresa, com escopo de permissões, hash armazenado, rotação e rate limit próprio. OAuth 2.0 quando houver aplicações de terceiros.
 - **Webhooks de saída** (futuro): assinatura HMAC e retentativas com backoff.
 
@@ -80,3 +83,17 @@ Nunca expor stack trace, SQL ou detalhes internos.
 | `GET /health/live` | O processo está de pé |
 | `GET /health/ready` | O processo está pronto (banco acessível) |
 | `GET /api/docs` | OpenAPI (restrito em produção) |
+
+## 10. Autenticação (M02)
+
+Contratos completos, códigos de erro e fluxos em [M02 §7](modules/M02-autenticacao.md).
+
+| Método | Rota | Autenticação | CSRF | Sucesso |
+|---|---|---|---|---|
+| `POST` | `/api/v1/auth/login` | Pública | Origem + JSON | 200 + cookie |
+| `POST` | `/api/v1/auth/logout` | Opcional (idempotente) | Sim, se houver sessão | 204 |
+| `GET` | `/api/v1/auth/session` | Sessão | — | 200 (`user`, `session`, `csrfToken`) |
+| `POST` | `/api/v1/auth/password` | Sessão | Sim | 200 + cookie novo |
+| `GET` | `/api/v1/auth/sessions` | Sessão | — | 200 |
+| `DELETE` | `/api/v1/auth/sessions/{id}` | Sessão | Sim | 204 |
+| `POST` | `/api/v1/auth/sessions/revoke-others` | Sessão | Sim | 204 |

@@ -2,7 +2,7 @@
 
 Plataforma modular de gestão para food service: restaurantes e hamburguerias no início e, no futuro, outros tipos de operação de alimentação.
 
-> **Status:** M01 — Fundação técnica implementado (sem funcionalidades de negócio). API, web, PostgreSQL em Docker, migrations, testes e CI estão operacionais. Próximo módulo: M02 — Autenticação ([roadmap](docs/06-ROADMAP.md)).
+> **Status:** M01 — Fundação técnica concluído. M02 — Autenticação implementado (login, sessões, CSRF, rate limiting, CLI de usuários), aguardando aprovação. Ainda sem funcionalidades de negócio ([roadmap](docs/06-ROADMAP.md)).
 
 ---
 
@@ -48,9 +48,27 @@ docker compose up -d          # PostgreSQL 18 em 127.0.0.1:5432 (gastrohub + gas
 pnpm db:migrate               # migrations no banco de desenvolvimento (como gastrohub_owner)
 pnpm db:validate              # confere ICU, encoding, owner, papéis e privilégios
 
+pnpm seed:dev                 # cria dev@gastrohub.local (pede a senha, sem eco)
+
 # dia a dia
 pnpm dev                      # API em http://127.0.0.1:3000 e web em http://127.0.0.1:5173
 ```
+
+Já tem um `.env` de antes do M02? Acrescente as variáveis novas (`AUTH_SECRET` etc.) sem mexer nas senhas do banco:
+
+```powershell
+pnpm env:init -- --add-missing
+```
+
+### Usuários (CLI)
+
+Não há cadastro público: usuários são criados por linha de comando. As senhas são pedidas sem eco, ou lidas com `--password-stdin`; nunca vão como argumento.
+
+| Comando | Função |
+|---|---|
+| `pnpm user:create` | Cria usuário (pergunta e-mail, nome e senha) |
+| `pnpm user:set-password <email>` | Redefine a senha e encerra todas as sessões (recuperação operacional) |
+| `pnpm user:disable <email>` / `pnpm user:enable <email>` | Desativa (encerra as sessões) / reativa |
 
 | Comando | Função |
 |---|---|
@@ -63,7 +81,7 @@ pnpm dev                      # API em http://127.0.0.1:3000 e web em http://127
 | `docker compose --profile app up -d --build` | Stack completa em containers (web em http://127.0.0.1:8080) |
 | `docker compose down -v` | Para tudo e **apaga** o volume do banco de desenvolvimento |
 
-Endpoints: `GET /health/live`, `GET /health/ready` e OpenAPI em `/api/docs` (somente fora de produção).
+Endpoints: `GET /health/live`, `GET /health/ready`, autenticação em `/api/v1/auth/*` ([docs/04-API.md](docs/04-API.md) §10) e OpenAPI em `/api/docs` (somente fora de produção). Web: `/login`, área autenticada em `/`, `/conta/senha`, `/conta/sessoes` e status público em `/status`.
 
 Detalhes de ambiente, banco e CI em [docs/05-DEPLOY.md](docs/05-DEPLOY.md).
 
