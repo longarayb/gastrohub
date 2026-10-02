@@ -2,9 +2,11 @@ import { type HealthLiveResponse, type HealthReadyResponse } from '@gastrohub/co
 import { Controller, Get, Inject } from '@nestjs/common';
 import { ApiOkResponse, ApiServiceUnavailableResponse, ApiTags } from '@nestjs/swagger';
 
+import { Public } from '../../shared/http/public.decorator.js';
 import { HealthService } from './health.service.js';
 
 @ApiTags('health')
+@Public()
 @Controller('health')
 export class HealthController {
   constructor(@Inject(HealthService) private readonly health: HealthService) {}

@@ -14,6 +14,11 @@ export const REDACTED_PATHS = [
   '*.password',
   '*.passwordHash',
   '*.token',
+  // M02 §9.7
+  'req.headers["x-csrf-token"]',
+  '*.currentPassword',
+  '*.newPassword',
+  '*.csrfToken',
 ];
 
 // Sob Fastify o middleware roda via middie, que reescreve req.url; o caminho real fica em originalUrl.
