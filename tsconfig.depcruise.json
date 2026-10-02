@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx"
+  },
+  "include": ["apps/*/src/**/*", "packages/*/src/**/*"]
+}

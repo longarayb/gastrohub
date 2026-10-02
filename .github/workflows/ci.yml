@@ -1,0 +1,96 @@
+# GastroHub — CI (docs/modules/M01-fundacao-tecnica.md §12)
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Lint, testes e build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Node.js 24
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: pnpm (Corepack, versão do packageManager)
+        run: corepack enable
+
+      - name: Instalar dependências
+        run: pnpm install --frozen-lockfile
+
+      - name: Formatação
+        run: pnpm format:check
+
+      - name: Lint e fronteiras entre módulos
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Testes unitários
+        run: pnpm test
+
+      # Mesmo docker-compose.yml do desenvolvimento (paridade). O .env é gerado
+      # com senhas aleatórias a cada execução e nunca sai do runner.
+      - name: Gerar .env efêmero
+        run: pnpm env:init
+
+      - name: Subir PostgreSQL 18
+        run: docker compose up -d --wait postgres
+
+      - name: Validar banco (ICU, owner, papéis, privilégios)
+        run: pnpm db:validate
+
+      - name: Testes de integração (gastrohub_test)
+        run: pnpm test:integration
+
+      - name: Build
+        run: pnpm build
+
+      - name: Build das imagens Docker
+        run: docker compose --profile app build
+
+      - name: Auditoria de dependências
+        run: pnpm audit --audit-level=high
+
+      - name: Logs do PostgreSQL em caso de falha
+        if: failure()
+        run: docker compose logs postgres
+
+      - name: Encerrar containers
+        if: always()
+        run: docker compose --profile app down -v
+
+  secret-scan:
+    name: Varredura de segredos
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout (histórico completo)
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: gitleaks
+        run: >
+          docker run --rm -v "${{ github.workspace }}:/repo"
+          ghcr.io/gitleaks/gitleaks:v8.30.1
+          git /repo --redact --verbose

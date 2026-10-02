@@ -42,17 +42,19 @@ Sem `app.company_id` definido, `current_setting(..., true)` retorna `NULL` e **n
 
 | Papel | Uso | Privilégios |
 |---|---|---|
-| `gastrohub_owner` | Dono do schema; executa migrations | DDL; não usado pela aplicação em runtime |
-| `gastrohub_app` | Conexão da API em runtime | DML apenas; **sem** `BYPASSRLS`, **sem** ser dono das tabelas |
+| `gastrohub_owner` | Dono dos bancos e do schema; executa migrations | DDL; não usado pela aplicação em runtime |
+| `gastrohub_app` | Conexão da API em runtime | Apenas `CONNECT` no banco, `USAGE` no schema `public` e DML (`SELECT/INSERT/UPDATE/DELETE`) via default privileges. **Sem** `CREATE`, `TEMPORARY`, `TRUNCATE`, `REFERENCES`, `TRIGGER`; **sem** `SUPERUSER`/`BYPASSRLS`; **não** é dono de nenhum objeto |
 | `gastrohub_readonly` | Relatórios/suporte (futuro) | SELECT com RLS |
 
-> **Atenção:** superusuários (ex.: `postgres`) e donos das tabelas **sempre ignoram RLS**, mesmo com `FORCE`. Por isso a aplicação conecta exclusivamente como `gastrohub_app`. Os papéis são criados por [`infra/database/01-roles.sql`](../infra/database/01-roles.sql).
+> **Atenção:** superusuários (ex.: `postgres`) e donos das tabelas **sempre ignoram RLS**, mesmo com `FORCE`. Por isso a aplicação conecta exclusivamente como `gastrohub_app`, e a API **recusa iniciar** se o papel de runtime for SUPERUSER ou tiver BYPASSRLS (coberto por teste). Migrations também recusam rodar como superusuário.
+
+Garantias verificadas automaticamente (`apps/api/test/database-security.int-spec.ts` e `pnpm db:validate`): flags dos papéis, privilégios de banco e schema, default privileges somente DML, DDL negado ao runtime (`42501`), schema `drizzle` inacessível ao runtime e ausência de tabelas de negócio.
 
 ### Ambiente local
 
-PostgreSQL 18.6 nativo em `localhost:5432`, banco `gastrohub`. As tabelas são criadas pela aplicação via migrations. Detalhes em [05-DEPLOY](05-DEPLOY.md) §2.
+**Banco oficial de desenvolvimento: container `postgres:18.6`** em `127.0.0.1:5432`, com os bancos `gastrohub` e `gastrohub_test` criados por [`infra/database/docker-init/`](../infra/database/docker-init/). As tabelas são criadas pela aplicação via migrations (`pnpm db:migrate`). O PostgreSQL nativo do Windows fica como fallback desativado. Detalhes em [05-DEPLOY](05-DEPLOY.md) §2.
 
-**Collation: decisão de 2026-10-01.** O banco foi criado inicialmente com `Portuguese_Brazil.1252`, um locale que só existe no Windows. O responsável do projeto decidiu **recriá-lo com ICU** enquanto ainda estava vazio ([`00-recreate-database-icu.sql`](../infra/database/00-recreate-database-icu.sql)):
+**Collation: decisão de 2026-10-01.** O banco foi criado inicialmente com `Portuguese_Brazil.1252`, um locale que só existe no Windows. O responsável do projeto decidiu usar **ICU** (o nativo foi recriado com [`00-recreate-database-icu.sql`](../infra/database/00-recreate-database-icu.sql); o container já nasce assim):
 
 | Configuração | Valor |
 |---|---|
@@ -61,9 +63,9 @@ PostgreSQL 18.6 nativo em `localhost:5432`, banco `gastrohub`. As tabelas são c
 | Locale ICU | `pt-BR` |
 | `LC_COLLATE` / `LC_CTYPE` | `C` (portável; a ordenação vem do ICU) |
 | Template | `template0` (criação limpa) |
-| Owner | `gastrohub_owner` (após [`01-roles.sql`](../infra/database/01-roles.sql)) |
+| Owner | `gastrohub_owner` |
 
-**Validado em 2026-10-01** (PostgreSQL 18.6 nativo, `99-validate.sql`): provider `icu`, locale `pt-BR`, `UTF8`, owner `gastrohub_owner`, `gastrohub_app` e `gastrohub_owner` com `rolsuper = f` e `rolbypassrls = f`, 0 tabelas, ordenação pt-BR correta (a, á, b, ç, d, É, z). Os papéis no banco nativo **não têm senha** (login desabilitado), porque o banco oficial será o container (M01).
+**Validado em 2026-10-01** no container (`gastrohub` e `gastrohub_test`) e no nativo: provider `icu`, locale `pt-BR`, `UTF8`, owner `gastrohub_owner`, papéis com `rolsuper = f` e `rolbypassrls = f`, ordenação pt-BR correta (a, á, b, ç, d, É, z). Os papéis no banco nativo **não têm senha** (login desabilitado).
 
 Motivo: ordenação, índices e dumps idênticos em Windows, CI e produção (Linux). A configuração efetiva é verificada com [`99-validate.sql`](../infra/database/99-validate.sql). Toda nova instância (container, CI, produção) deve ser criada com os mesmos parâmetros.
 
@@ -126,9 +128,11 @@ branch_id   uuid NOT NULL   -- quando o dado pertence a uma filial (pedido, caix
 
 ## 5. Migrations e seeds
 
-- Migrations SQL versionadas em `apps/api/drizzle/`, geradas pelo drizzle-kit e **revisadas manualmente** (policies RLS são escritas à mão).
+- Migrations SQL versionadas em `apps/api/drizzle/`, geradas pelo drizzle-kit (`pnpm db:generate`) e **revisadas manualmente** (policies RLS são escritas à mão).
+- Aplicadas por `apps/api/scripts/migrate.ts` **como `gastrohub_owner`** (`pnpm db:migrate` / `pnpm db:migrate:test`), registradas em `drizzle.__drizzle_migrations`. O script recusa superusuário e, no alvo de teste, bancos sem sufixo `_test`.
+- M01: apenas `0000_baseline` (sem tabelas; prova o pipeline).
 - Migrations são **somente para frente** em produção. Uma correção é feita com uma nova migration.
-- Seeds separados:
+- Seeds separados (a partir do M02/M04):
   - `seed:system`: catálogo de permissões e papéis-modelo (idempotente, roda em todo ambiente).
   - `seed:dev`: empresa, filiais e usuários fictícios **apenas** para desenvolvimento local.
 - O CI aplica todas as migrations em um PostgreSQL limpo e roda os testes de isolamento.

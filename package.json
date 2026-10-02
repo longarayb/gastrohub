@@ -1,0 +1,32 @@
+{
+  "name": "gastrohub",
+  "private": true,
+  "description": "GastroHub — plataforma modular de gestão para food service",
+  "packageManager": "pnpm@12.8.1",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "env:init": "node scripts/env-init.mjs",
+    "dev": "pnpm --filter @gastrohub/contracts build && pnpm --parallel --filter @gastrohub/api --filter @gastrohub/web dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm --filter @gastrohub/contracts build && pnpm -r typecheck",
+    "lint": "eslint . && pnpm deps:check",
+    "deps:check": "depcruise apps packages --config .dependency-cruiser.cjs",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "pnpm --filter @gastrohub/contracts build && pnpm -r test",
+    "test:integration": "pnpm --filter @gastrohub/contracts build && pnpm --filter @gastrohub/api test:integration",
+    "db:generate": "pnpm --filter @gastrohub/api db:generate",
+    "db:migrate": "pnpm --filter @gastrohub/api db:migrate",
+    "db:migrate:test": "pnpm --filter @gastrohub/api db:migrate:test",
+    "db:validate": "node scripts/db-validate.mjs"
+  },
+  "devDependencies": {
+    "@gastrohub/config": "workspace:*",
+    "dependency-cruiser": "^18.5.0",
+    "eslint": "^10.11.0",
+    "prettier": "^3.9.9",
+    "typescript": "~6.0.3"
+  }
+}

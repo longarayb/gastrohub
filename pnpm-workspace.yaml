@@ -1,0 +1,11 @@
+packages:
+  - apps/*
+  - packages/*
+
+# Scripts de instalação de dependências só rodam se aprovados explicitamente.
+allowBuilds:
+  # Telemetria do swagger-ui-dist: não autorizado.
+  '@scarf/scarf': false
+  # Compiladores nativos: os scripts validam o binário da plataforma.
+  '@swc/core': true
+  esbuild: true

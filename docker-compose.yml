@@ -1,0 +1,74 @@
+# GastroHub — ambiente local
+#
+#   docker compose up -d                          # somente PostgreSQL (fluxo diário)
+#   docker compose --profile app up -d --build    # stack completa em containers
+#
+# Variáveis lidas do .env (gerado por `pnpm env:init`, não versionado).
+
+name: gastrohub
+
+services:
+  postgres:
+    image: postgres:18.6
+    container_name: gastrohub-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env (pnpm env:init)}
+      GASTROHUB_OWNER_PASSWORD: ${GASTROHUB_OWNER_PASSWORD:?defina GASTROHUB_OWNER_PASSWORD no .env}
+      GASTROHUB_APP_PASSWORD: ${GASTROHUB_APP_PASSWORD:?defina GASTROHUB_APP_PASSWORD no .env}
+    ports:
+      # Somente na interface local: o banco não fica exposto na rede.
+      - '127.0.0.1:${POSTGRES_PORT:-5432}:5432'
+    volumes:
+      - gastrohub_pgdata:/var/lib/postgresql
+      - ./infra/database/docker-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # Via TCP: durante o init o servidor temporário só escuta no socket local,
+      # então o container só fica "healthy" depois que o init terminar.
+      test: ['CMD-SHELL', 'pg_isready -h 127.0.0.1 -U postgres -d gastrohub']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  # ------------------------------------------------------------------
+  # Profile "app": stack completa em containers (paridade com produção).
+  # A API não é publicada no host; é acessada pelo nginx do serviço web.
+  # ------------------------------------------------------------------
+  api:
+    profiles: ['app']
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    image: gastrohub-api:local
+    container_name: gastrohub-api
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      API_HOST: 0.0.0.0
+      API_PORT: 3000
+      CORS_ORIGINS: http://localhost:8080
+      # Montada a partir da senha do .env; nenhuma credencial fica neste arquivo.
+      DATABASE_URL: postgres://gastrohub_app:${GASTROHUB_APP_PASSWORD:?defina GASTROHUB_APP_PASSWORD no .env}@postgres:5432/gastrohub
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    profiles: ['app']
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    image: gastrohub-web:local
+    container_name: gastrohub-web
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:8080:8080'
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  gastrohub_pgdata:
+    name: gastrohub_pgdata

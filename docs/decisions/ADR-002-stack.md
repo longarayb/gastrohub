@@ -1,7 +1,8 @@
 # ADR-002 — Stack tecnológica
 
-- Status: Proposto
+- Status: Aceito
 - Data: 2026-10-01
+- Aceito em: 2026-10-01, pelo responsável do projeto (com todos os pontos detalhados abaixo)
 
 ## Contexto
 
@@ -43,11 +44,12 @@ Escolher linguagem, frameworks, banco, ORM e ferramentas de teste que sejam prod
 - **Desvantagens:** projeto mais jovem que o Prisma; algumas operações exigem SQL manual.
 - **Alternativas:** Prisma (DX excelente, mas RLS exige transações interativas com extensão, o que custa performance e complexidade); TypeORM (manutenção irregular, tipos fracos); Kysely (query builder excelente, mas sem schema/migrations integrados).
 
-### Testes: Vitest + Supertest + Testcontainers; Playwright depois
+### Testes: Vitest + Supertest contra PostgreSQL real; Playwright depois
 
 - **Vantagens:** testes de integração contra PostgreSQL **real**, indispensáveis para validar RLS. Vitest é rápido e compatível com TS/ESM.
-- **Desvantagens:** Testcontainers exige Docker na máquina e no CI.
-- **Alternativas:** Jest (mais lento, configuração ESM trabalhosa); banco em memória (não valida RLS, descartado).
+- **Banco de testes** (decisão do responsável, 2026-10-01): banco `gastrohub_test` separado, no mesmo container PostgreSQL do desenvolvimento. Os testes se recusam a rodar contra banco cujo nome não termine em `_test`. Isso substitui o Testcontainers da proposta original.
+- **Desvantagens:** os testes de integração exigem o container PostgreSQL ativo (local e CI).
+- **Alternativas:** Jest (mais lento, configuração ESM trabalhosa); Testcontainers (mais um container por execução); banco em memória (não valida RLS, descartado).
 
 ### Qualidade: ESLint + Prettier, TypeScript `strict`
 
@@ -61,5 +63,20 @@ Escolher linguagem, frameworks, banco, ORM e ferramentas de teste que sejam prod
 
 - Node.js LTS e pnpm passam a ser pré-requisitos (ainda não instalados na máquina atual).
 - *Atualização 2026-10-01:* o desenvolvimento local usa PostgreSQL 18.6 **nativo** (`localhost:5432`). Testes de integração locais rodam contra um banco dedicado `gastrohub_test`, e o CI usa um service container PostgreSQL 18. Docker Desktop foi instalado. Decisão do responsável: o banco oficial de desenvolvimento será o PostgreSQL 18 em Docker, na porta 5432 (opção B, [05-DEPLOY](../05-DEPLOY.md) §2), implantado no M01.
-- Versões exatas serão fixadas no M01 (`engines`, `packageManager`, tags de imagem Docker).
 - A escolha de ORM é a de maior risco de troca futura. Mitigação: acesso a dados isolado na camada `infrastructure/` de cada módulo.
+
+## Registro de implementação (M01, 2026-10-01)
+
+Versões fixadas no M01 (lockfile `pnpm-lock.yaml` é a fonte exata):
+
+| Item | Versão | Observação |
+|---|---|---|
+| Node.js | 24 LTS (`engines: >=24 <25`) | Imagens: `node:24.21.0-alpine3.24` |
+| pnpm | 12.8.1 (`packageManager`, via Corepack) | |
+| TypeScript | **6.0.x** | O TypeScript 7 (compilador nativo) ainda não expõe a API JavaScript usada por typescript-eslint (`<6.1`), Nest CLI e drizzle-kit. Reavaliar quando o ecossistema suportar |
+| NestJS | 12.x + `@nestjs/platform-fastify` | **NestJS 12 é distribuído somente em ESM**: a API é um pacote ESM (`"type": "module"`, imports com `.js`). Injeção de dependência com `@Inject(token)` explícito |
+| React / React Router / TanStack Query | 19 / 8 / 5 | |
+| Vite / Tailwind CSS / Vitest | 8 / 4 / 5 | Vitest da API usa SWC (`unplugin-swc`) para metadados de decorators |
+| zod | 4 | |
+| drizzle-orm / drizzle-kit | 0.45 / 0.31 | |
+| PostgreSQL | `postgres:18.6` | |
