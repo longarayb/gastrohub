@@ -12,10 +12,8 @@ import {
 
 function clientWithSession(): QueryClient {
   const queryClient = new QueryClient();
-  queryClient.setQueryData<SessionState>(SESSION_QUERY_KEY, {
-    status: 'authenticated',
-    data: SESSION,
-  });
+  const state: SessionState = { status: 'authenticated', data: SESSION };
+  queryClient.setQueryData(SESSION_QUERY_KEY, state);
   return queryClient;
 }
 

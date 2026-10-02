@@ -53,7 +53,13 @@ export function mockFetch(routesByKey: Record<string, Handler>) {
   return { calls, fetchMock };
 }
 
-export function renderApp(initialPath: string) {
+export interface RenderedApp {
+  router: ReturnType<typeof createMemoryRouter>;
+  queryClient: QueryClient;
+  unmount: () => void;
+}
+
+export function renderApp(initialPath: string): RenderedApp {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
@@ -63,5 +69,5 @@ export function renderApp(initialPath: string) {
       <RouterProvider router={router} />
     </QueryClientProvider>,
   );
-  return { ...view, router, queryClient };
+  return { router, queryClient, unmount: view.unmount };
 }

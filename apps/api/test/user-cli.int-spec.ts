@@ -75,7 +75,7 @@ describe('CLI de usuários', () => {
     const email = uniqueEmail('cli');
     const result = await cli(
       ['create', '--email', email, '--name', 'BOM', '--password-stdin'],
-      `﻿${STRONG_PASSWORD}\r\n`,
+      String.fromCharCode(0xfeff) + STRONG_PASSWORD + '\r\n',
     );
     expect(result.code).toBe(0);
     expect((await new BrowserClient(app).login(email, STRONG_PASSWORD)).status).toBe(200);
