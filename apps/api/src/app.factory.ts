@@ -4,14 +4,15 @@ import { type Http2ServerRequest } from 'node:http2';
 import fastifyCookie from '@fastify/cookie';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
-import { type DynamicModule, RequestMethod, type Type } from '@nestjs/common';
+import { RequestMethod } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { Logger } from 'nestjs-pino';
 
-import { AppModule } from './app.module.js';
+import { AppModule, type AppModuleOptions } from './app.module.js';
 import { type AppConfig } from './shared/config/config.schema.js';
+import { ApiException } from './shared/http/api-exception.js';
 import { REQUEST_ID_HEADER, resolveRequestId } from './shared/http/request-id.js';
 
 /** Rotas de negócio ficam sob /api/v1; health fica fora do prefixo (docs/04-API.md). */
@@ -38,10 +39,8 @@ const SWAGGER_CSP = {
   },
 };
 
-export interface CreateAppOptions {
-  /** Módulos adicionais (somente testes, ex.: rota protegida de teste). */
-  extraModules?: (Type | DynamicModule)[];
-}
+/** Opções usadas somente por testes (módulos extras, destino de log). */
+export type CreateAppOptions = AppModuleOptions;
 
 export async function createApp(
   config: AppConfig,
@@ -50,7 +49,7 @@ export async function createApp(
   const docsEnabled = config.NODE_ENV !== 'production';
 
   const app = await NestFactory.create<NestFastifyApplication>(
-    AppModule.register(config, options.extraModules),
+    AppModule.register(config, options),
     new FastifyAdapter({
       // Número de proxies confiáveis (D11): define request.ip para rate limit e auth_events.
       // Forma de função equivalente a "confiar nos N primeiros saltos".
@@ -64,7 +63,9 @@ export async function createApp(
         resolveRequestId(req.headers[REQUEST_ID_HEADER]),
     }),
     // abortOnError: false → falhas de inicialização chegam ao chamador (main.ts encerra com código 1).
-    { bufferLogs: true, abortOnError: false },
+    // bodyParser: false → o Nest não registra parsers extras (ex.: formulário urlencoded); fica
+    // só o parser JSON do Fastify (CSRF camada 2, M02 §9.4).
+    { bufferLogs: true, abortOnError: false, bodyParser: false },
   );
   app.useLogger(app.get(Logger));
   app.enableShutdownHooks();
@@ -84,17 +85,18 @@ export async function createApp(
   await app.register(rateLimit, {
     ...GLOBAL_RATE_LIMIT,
     allowList: (request) => request.url.startsWith('/health/'),
-    errorResponseBuilder: (request, context) => ({
-      statusCode: 429,
-      type: 'about:blank',
-      title: 'Muitas requisições',
-      status: 429,
-      detail: 'Muitas requisições. Tente novamente mais tarde.',
-      instance: request.url.split('?')[0],
-      requestId: request.id,
-      code: 'rate_limited',
-      retryAfterSeconds: Math.ceil(context.ttl / 1000),
-    }),
+    // Mesmo formato dos demais 429 (Problem Details com code e Retry-After), via filtro global.
+    errorResponseBuilder: (_request, context) =>
+      Object.assign(
+        new ApiException(
+          429,
+          'rate_limited',
+          'Muitas requisições. Tente novamente mais tarde.',
+          undefined,
+          { 'Retry-After': String(Math.max(1, Math.ceil(context.ttl / 1000))) },
+        ),
+        { statusCode: 429 },
+      ),
   });
   app.enableCors({ origin: config.CORS_ORIGINS, credentials: true });
 
