@@ -23,6 +23,8 @@ export interface SessionRecord {
   createdAt: Date;
   lastSeenAt: Date;
   expiresAt: Date;
+  /** Empresa ativa (M03 §4); null = nenhuma selecionada. */
+  activeCompanyId: string | null;
 }
 
 export interface SessionWithUser extends SessionRecord {
@@ -38,6 +40,7 @@ export interface NewSession {
   absoluteTtlHours: number;
   ip: string | null;
   userAgent: string | null;
+  activeCompanyId?: string | null;
 }
 
 /** Limite de sessões ativas por usuário (D3). */
@@ -58,6 +61,7 @@ const sessionColumns = {
   createdAt: sessions.createdAt,
   lastSeenAt: sessions.lastSeenAt,
   expiresAt: sessions.expiresAt,
+  activeCompanyId: sessions.activeCompanyId,
 };
 
 @Injectable()
@@ -126,9 +130,19 @@ export class IdentityRepository {
         expiresAt: sql`now() + make_interval(hours => ${data.absoluteTtlHours})`,
         ip: data.ip,
         userAgent: data.userAgent,
+        activeCompanyId: data.activeCompanyId ?? null,
       })
       .returning(sessionColumns);
     return row!;
+  }
+
+  /** Define (ou limpa) a empresa ativa de uma sessão (M03 §4). */
+  async setActiveCompany(
+    sessionId: string,
+    companyId: string | null,
+    db: Executor = this.db,
+  ): Promise<void> {
+    await db.update(sessions).set({ activeCompanyId: companyId }).where(eq(sessions.id, sessionId));
   }
 
   async findSessionByTokenHash(

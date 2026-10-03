@@ -74,6 +74,8 @@ export class LoginService {
       ? await this.hasher.hash(input.password)
       : null;
     const currentHash = hashSessionToken(currentToken);
+    // M03 D5: com exatamente uma empresa, ela já vem selecionada.
+    const activeCompanyId = await this.sessions.autoSelectCompany(user.id);
 
     const created = await this.repo.db.transaction(async (tx) => {
       if (currentHash) {
@@ -83,7 +85,7 @@ export class LoginService {
         }
       }
       if (rehash) await this.repo.updatePasswordHash(user.id, rehash, false, tx);
-      const session = await this.sessions.create(user.id, meta, tx);
+      const session = await this.sessions.create(user.id, meta, tx, activeCompanyId);
       await this.repo.updateLastLogin(user.id, tx);
       await this.events.record(
         { ...base, eventType: 'login_succeeded', userId: user.id, sessionId: session.record.id },

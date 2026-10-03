@@ -68,7 +68,11 @@ export class AuthController {
       user: result.user,
       session: this.sessions.sessionInfo(result.session),
       csrfToken: this.sessions.csrfToken(result.session.id),
-      activeCompany: null,
+      activeCompany: await this.sessions.describeActiveCompany(
+        result.user.id,
+        result.session.id,
+        result.session.activeCompanyId,
+      ),
     };
   }
 
@@ -93,13 +97,17 @@ export class AuthController {
   @ApiOperation({ summary: 'Sessão atual, usuário e token CSRF' })
   @ApiOkResponse({ description: 'Sessão válida' })
   @ApiUnauthorizedResponse({ description: 'unauthenticated / session_expired / session_revoked' })
-  currentSession(@Req() request: FastifyRequest): CurrentSession {
+  async currentSession(@Req() request: FastifyRequest): Promise<CurrentSession> {
     const session = request.authSession!;
     return {
       user: { id: session.user.id, email: session.user.email, name: session.user.name },
       session: this.sessions.sessionInfo(session),
       csrfToken: this.sessions.csrfToken(session.id),
-      activeCompany: null,
+      activeCompany: await this.sessions.describeActiveCompany(
+        session.user.id,
+        session.id,
+        session.activeCompanyId,
+      ),
     };
   }
 

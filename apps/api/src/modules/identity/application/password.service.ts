@@ -81,7 +81,8 @@ export class PasswordService {
     const created = await this.repo.db.transaction(async (tx) => {
       await this.repo.updatePasswordHash(user.id, newHash, true, tx);
       await this.repo.revokeUserSessions(user.id, 'password_changed', null, tx);
-      const session = await this.sessions.create(user.id, meta, tx);
+      // A sessão nova mantém a empresa ativa (a troca de senha não muda o contexto, M03).
+      const session = await this.sessions.create(user.id, meta, tx, context.activeCompanyId);
       await this.events.record(
         { ...base, eventType: 'password_changed', sessionId: session.record.id },
         tx,

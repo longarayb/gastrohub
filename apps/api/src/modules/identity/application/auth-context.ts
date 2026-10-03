@@ -2,6 +2,8 @@
 export interface AuthContext {
   userId: string;
   sessionId: string;
+  /** Empresa ativa da sessão (M03 §4.2); null = nenhuma selecionada. */
+  activeCompanyId: string | null;
 }
 
 /** Metadados da requisição usados em sessões e auth_events. */
