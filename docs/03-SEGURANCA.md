@@ -1,6 +1,6 @@
 # 03 — Segurança
 
-> Status: **autenticação implementada no M02** (§1, CSRF, rate limiting, logs e `auth_events`; detalhes em [M02](modules/M02-autenticacao.md)). Autorização (RBAC), isolamento por empresa e auditoria por empresa continuam como estratégia para M03/M04.
+> Status: **autenticação implementada no M02** (§1, CSRF, rate limiting, logs e `auth_events`; detalhes em [M02](modules/M02-autenticacao.md)). **Isolamento entre empresas implementado no M03** (§3; detalhes em [M03](modules/M03-empresas-filiais.md)). Autorização (RBAC) e auditoria por empresa continuam como estratégia para o M04.
 > Este documento **não** afirma conformidade com nenhuma norma ou lei (incluindo LGPD), nem certificação. Conformidade exige implementação, processos e evidências, que serão produzidos ao longo dos módulos.
 
 ## 1. Autenticação
@@ -13,7 +13,7 @@ Decisão em [ADR-004](decisions/ADR-004-autenticacao.md).
 | Hash de senha | **Argon2id** `m=19456 KiB, t=2, p=1` (mínimo OWASP), `@node-rs/argon2`, rehash automático, até 4 verificações simultâneas |
 | Política de senha | 12 a 128 caracteres (NFC); sem regras de composição; bloqueio das 10 mil senhas mais comuns (SecLists), da parte local do e-mail (4+ caracteres) e do nome. Verificação de vazamentos (HIBP) no backlog |
 | Sessão | Token opaco de 256 bits em cookie `HttpOnly`, `SameSite=Lax`, `Path=/`, sem `Domain`; `__Host-gh_session` com `Secure` fora de desenvolvimento. O banco guarda só o SHA-256 do token |
-| Expiração | Inatividade (12 h) + absoluta (7 dias), configuráveis; rotação no login e na troca de senha (troca de empresa ativa: M03) |
+| Expiração | Inatividade (12 h) + absoluta (7 dias), configuráveis; rotação no login, na troca de senha e na troca de empresa ativa (M03: `revoked_reason = 'company_switched'`) |
 | Revogação | Logout, encerrar sessão/outras sessões, troca de senha, usuário desativado e redefinição pelo operador (CLI) |
 | Força bruta | Rate limit por conta + IP (5/15 min), conta (20/60 min, com isenção de IP confiável) e IP (50/15 min), por janela (em vez de atraso progressivo). Bloqueio por conta é indistinguível de credenciais inválidas; 429 só por IP/global |
 | Recuperação | Por e-mail: módulo posterior (junto dos convites do M04). No M02, redefinição operacional via CLI (`pnpm user:set-password`) |
@@ -36,6 +36,14 @@ Detalhado em [02-BANCO-DE-DADOS](02-BANCO-DE-DADOS.md) §2:
 - RLS no PostgreSQL com `FORCE ROW LEVEL SECURITY`, e a aplicação conecta com um papel sem `BYPASSRLS`.
 - Testes automatizados de isolamento para cada tabela.
 - IDs UUID evitam enumeração, mas **não** substituem a verificação de autorização.
+
+**Implementado no M03:**
+
+- A empresa ativa fica na sessão (`sessions.active_company_id`), definida pela seleção automática no login (vínculo único) ou pela troca explícita, que rotaciona o token e o CSRF.
+- `TenantGuard` (`@RequiresCompany()`) revalida o vínculo e o status da empresa **a cada requisição de tenant**. Revogação ou suspensão valem na requisição seguinte (403 `company_access_revoked`), e a empresa ativa da sessão é limpa.
+- Pedir uma empresa sem vínculo responde o mesmo 404 que pedir uma empresa inexistente: não se revela que ela existe.
+- Contexto `app.company_id` / `app.user_id` por transação (`TenantDb`). As políticas usam `NULLIF` para conexões reaproveitadas, e o `gastrohub_app` não tem `DELETE` nas tabelas de tenant.
+- Na web, a troca de empresa descarta do cache todos os dados que não são da conta. Um 403 `company_access_revoked` limpa os dados da empresa e volta ao seletor.
 
 ## 4. Credenciais e segredos
 
@@ -65,6 +73,7 @@ Detalhado em [02-BANCO-DE-DADOS](02-BANCO-DE-DADOS.md) §2:
 - **Auditoria** (`audit_logs`, append-only): login/logout, falhas de login, mudanças de permissão, criação ou remoção de usuários, cancelamentos, estornos, ajustes de estoque, abertura e fechamento de caixa, alteração de preço. O registro guarda quem, o quê, quando, de onde e os valores antes e depois.
 - O papel da aplicação não pode alterar nem apagar registros de auditoria.
 - **M02:** eventos de autenticação ficam em `auth_events` (global, pré-tenant, append-only para o runtime). E-mails digitados em tentativas são guardados só como HMAC. A `audit_logs` por empresa (M04) registrará as ações de negócio.
+- **M03 (D12):** as operações administrativas da CLI (criar e suspender empresa, criar filial, vincular e desvincular usuário) são registradas **nos logs operacionais da aplicação**, sem `audit_logs`. O M04 introduz a auditoria por empresa e define sua política. Esses logs **não** substituem a auditoria de negócio.
 
 ## 7. LGPD: diretrizes de projeto
 

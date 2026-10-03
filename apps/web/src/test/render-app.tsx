@@ -32,6 +32,7 @@ export const SESSION = {
     idleExpiresAt: '2026-10-03T00:00:00.000Z',
   },
   csrfToken: 'csrf-token-de-teste',
+  activeCompany: null as { id: string; tradeName: string } | null,
 };
 
 /** Substitui fetch por um roteador de respostas e registra as chamadas. */

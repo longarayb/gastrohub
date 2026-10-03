@@ -34,7 +34,7 @@ import { PasswordHasher } from './infrastructure/password-hasher.js';
     // Guard global de autenticação: toda rota exige sessão, salvo @Public().
     { provide: APP_GUARD, useExisting: AuthGuard },
   ],
-  exports: [SessionService, UserAdminService],
+  exports: [SessionService, UserAdminService, AUTH_SETTINGS],
 })
 export class IdentityModule implements OnModuleInit {
   constructor(@Inject(PasswordHasher) private readonly hasher: PasswordHasher) {}

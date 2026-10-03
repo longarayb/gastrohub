@@ -32,6 +32,14 @@ Formato: `[módulo-alvo] descrição: origem/motivo`.
 - [Deploy/jobs] Expurgo de `sessions` (30 dias após o fim) e `auth_events` (180 dias), executado como `gastrohub_owner`: M02 §9.9.
 - [Técnico] Rate limit de login com contagem atômica: hoje os contadores são lidos antes da tentativa, e requisições paralelas podem ultrapassar o limite por poucas tentativas (M02 §20).
 - [Técnico] Rate limit global distribuído (Redis) quando houver mais de uma instância da API: M02 §9.5.
+- [M04] `audit_logs` por empresa e sua política; até lá, as operações da CLI de empresas ficam só nos logs operacionais: M03 D12.
+- [M04] Edição de empresa, filial e vínculos pela web (depende de "quem pode"): M03 D2.
+- [M04] Verificação de permissões no `TenantGuard`, sem alterar o mecanismo de tenancy: M03 §17.
+- [Caixa/PDV] Filial ativa / filial padrão do usuário: M03 D11.
+- [M14] Dados fiscais da empresa (IE, regime, CNAE, endereço fiscal, certificado): M03 D6.
+- [Técnico] Cache da revalidação do vínculo por requisição de tenant, se houver medição que o justifique: M03 §17.
+- [Deploy] Validar o contexto por transação (`set_config(..., true)`) com PgBouncer em modo transação: M03 §7.
+- [Futuro] Painel da plataforma para listar e administrar todas as empresas (exige ADR: caminho entre empresas): M03 §15.
 - [M04] Aprovação de supervisor para ações críticas (cancelamento de pedido pago, estorno, ajuste de estoque).
 - [M11] PIN de operador para troca rápida em terminal de PDV.
 - [Futuro] Login social / SSO para redes maiores.

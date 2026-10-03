@@ -5,11 +5,13 @@ import { APP_FILTER } from '@nestjs/core';
 
 import { HealthModule } from './modules/health/index.js';
 import { IdentityModule } from './modules/identity/index.js';
+import { OrganizationModule } from './modules/organization/index.js';
 import { ConfigModule } from './shared/config/config.module.js';
 import { type AppConfig } from './shared/config/config.schema.js';
 import { DatabaseModule } from './shared/database/database.module.js';
 import { ProblemDetailsFilter } from './shared/http/problem-details.filter.js';
 import { LoggingModule } from './shared/logging/logging.module.js';
+import { TenancyModule } from './shared/tenancy/tenant-db.js';
 
 export interface AppModuleOptions {
   /** Módulos adicionais (somente testes). */
@@ -27,7 +29,9 @@ export class AppModule {
         ConfigModule.register(config),
         LoggingModule.register(options.logDestination),
         DatabaseModule,
+        TenancyModule,
         IdentityModule,
+        OrganizationModule,
         HealthModule,
         ...(options.extraModules ?? []),
       ],

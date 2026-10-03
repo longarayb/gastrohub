@@ -22,6 +22,19 @@ module.exports = {
       to: { path: '^apps/api/src/modules/' },
     },
     {
+      name: 'tenant-data-only-via-tenant-db',
+      comment:
+        'Tabelas de tenant só são acessadas pelo TenantDb (shared/tenancy), que aplica app.company_id. ' +
+        'O acesso direto ao pool fica restrito ao identity (tabelas globais) e ao health ' +
+        '(verificação técnica de conexão, sem tabelas). Ver M03 §7.',
+      severity: 'error',
+      from: {
+        path: '^apps/api/src/modules/',
+        pathNot: '^apps/api/src/modules/(identity|health)/',
+      },
+      to: { path: '^apps/api/src/shared/database/' },
+    },
+    {
       name: 'apps-are-isolated',
       comment: 'API e web só compartilham código via packages/*.',
       severity: 'error',

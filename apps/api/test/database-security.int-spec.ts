@@ -147,7 +147,7 @@ describe('banco de teste: configuração e privilégios', () => {
     });
   });
 
-  it('migrations aplicadas; no schema public apenas as tabelas de identidade do M02', async () => {
+  it('migrations aplicadas; no schema public só identidade (M02) e tenancy (M03)', async () => {
     const result = await withClient(testOwnerUrl(), async (client) => {
       const migrations = await client.query<{ n: number }>(
         'SELECT count(*)::int AS n FROM drizzle.__drizzle_migrations',
@@ -156,20 +156,29 @@ describe('banco de teste: configuração e privilégios', () => {
         `SELECT table_name FROM information_schema.tables
           WHERE table_schema = 'public' ORDER BY table_name`,
       );
-      const tenantColumns = await client.query<{ n: number }>(
-        `SELECT count(*)::int AS n FROM information_schema.columns
-          WHERE table_schema = 'public' AND column_name IN ('company_id', 'branch_id')`,
+      const tenantTables = await client.query<{ table_name: string }>(
+        `SELECT DISTINCT table_name FROM information_schema.columns
+          WHERE table_schema = 'public' AND column_name IN ('company_id', 'branch_id')
+          ORDER BY table_name`,
       );
       return {
         migrations: migrations.rows[0]?.n,
         tables: tables.rows.map((r) => r.table_name),
-        tenantColumns: tenantColumns.rows[0]?.n,
+        tenantTables: tenantTables.rows.map((r) => r.table_name),
       };
     });
-    expect(result.migrations).toBeGreaterThanOrEqual(2);
-    // Nenhuma tabela de negócio, de tenant ou de RBAC (M02 §16).
-    expect(result.tables).toEqual(['auth_events', 'sessions', 'users']);
-    expect(result.tenantColumns).toBe(0);
+    expect(result.migrations).toBeGreaterThanOrEqual(3);
+    // Nenhuma tabela de negócio nem de RBAC (M02 §16, M03 §15).
+    expect(result.tables).toEqual([
+      'auth_events',
+      'branches',
+      'companies',
+      'memberships',
+      'sessions',
+      'users',
+    ]);
+    // Só as tabelas de tenant do M03 têm company_id (todas com RLS: tenancy-database.int-spec.ts).
+    expect(result.tenantTables).toEqual(['branches', 'memberships']);
   });
 
   it(`o banco de teste é "${database}" (sufixo _test)`, () => {

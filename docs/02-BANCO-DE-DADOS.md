@@ -12,18 +12,22 @@
 
 Defesa em duas camadas:
 
-1. **Aplicação:** todo acesso a dados passa por um repositório que exige o contexto de tenant da requisição.
+1. **Aplicação:** todo acesso a tabela de tenant passa pelo `TenantDb` (`shared/tenancy`, [M03 §7](modules/M03-empresas-filiais.md)), que aplica o contexto da requisição. A regra de fronteira `tenant-data-only-via-tenant-db` (dependency-cruiser) impede módulos de negócio de usar o pool diretamente.
 2. **Banco:** policies RLS rejeitam qualquer linha de outra empresa, mesmo que a aplicação tenha um bug.
 
 ### Como o contexto é aplicado
 
 ```text
-Requisição → autenticação (sessão) → resolve user + company ativa + permissões
-          → abre transação
-          → SELECT set_config('app.company_id', '<uuid>', true)   -- vale só na transação
-          → queries da requisição
-          → COMMIT
+Requisição → autenticação (sessão) → user + empresa ativa (TenantGuard revalida o vínculo)
+          → tenantDb.run({ companyId, userId }, tx => …)
+              → abre transação
+              → SELECT set_config('app.company_id', '<uuid>', true),
+                       set_config('app.user_id',    '<uuid>', true)   -- valem só na transação
+              → queries do caso de uso
+              → COMMIT
 ```
+
+`app.user_id` serve **somente** para o usuário enxergar os próprios vínculos e as empresas a que pertence (seletor de empresa, M03 D3). Permissões entram no M04.
 
 ### Policy padrão (aplicada a toda tabela de tenant)
 
@@ -32,11 +36,15 @@ ALTER TABLE <tabela> ENABLE ROW LEVEL SECURITY;
 ALTER TABLE <tabela> FORCE ROW LEVEL SECURITY;
 
 CREATE POLICY tenant_isolation ON <tabela>
-  USING      (company_id = current_setting('app.company_id', true)::uuid)
-  WITH CHECK (company_id = current_setting('app.company_id', true)::uuid);
+  USING      (company_id = NULLIF(current_setting('app.company_id', true), '')::uuid)
+  WITH CHECK (company_id = NULLIF(current_setting('app.company_id', true), '')::uuid);
 ```
 
-Sem `app.company_id` definido, `current_setting(..., true)` retorna `NULL` e **nenhuma linha é visível**: o sistema falha de forma fechada.
+Sem `app.company_id` definido, a expressão vale `NULL` e **nenhuma linha é visível**: o sistema falha de forma fechada.
+
+> **O `NULLIF` é obrigatório.** Depois que uma variável `app.*` é usada numa conexão, `current_setting(..., true)` devolve `''` (e não `NULL`) nas transações seguintes da mesma conexão. Sem o `NULLIF`, `''::uuid` gera erro em conexões reaproveitadas do pool (descoberto nos testes do M03).
+
+`memberships` e `companies` têm políticas próprias que também consideram `app.user_id` ([M03 §6.2](modules/M03-empresas-filiais.md)); a escrita continua restrita à empresa do contexto.
 
 ### Papéis de banco
 
@@ -48,7 +56,7 @@ Sem `app.company_id` definido, `current_setting(..., true)` retorna `NULL` e **n
 
 > **Atenção:** superusuários (ex.: `postgres`) e donos das tabelas **sempre ignoram RLS**, mesmo com `FORCE`. Por isso a aplicação conecta exclusivamente como `gastrohub_app`, e a API **recusa iniciar** se o papel de runtime for SUPERUSER ou tiver BYPASSRLS (coberto por teste). Migrations também recusam rodar como superusuário.
 
-Garantias verificadas automaticamente (`apps/api/test/database-security.int-spec.ts` e `pnpm db:validate`): flags dos papéis, privilégios de banco e schema, default privileges somente DML, DDL negado ao runtime (`42501`), schema `drizzle` inacessível ao runtime e ausência de tabelas de negócio.
+Garantias verificadas automaticamente (`apps/api/test/database-security.int-spec.ts` e `pnpm db:validate`): flags dos papéis, privilégios de banco e schema, default privileges somente DML, DDL negado ao runtime (`42501`), schema `drizzle` inacessível ao runtime e lista exata das tabelas existentes (nenhuma além das especificadas). As tabelas de tenant têm ainda os testes de isolamento da §6 (`tenancy-database.int-spec.ts`).
 
 ### Ambiente local
 
@@ -88,11 +96,11 @@ companies ──< audit_logs
 | Tabela | Escopo | Campos principais |
 |---|---|---|
 | `users` | Global | **M02:** `id`, `email` (único, `text` normalizado: NFC, trim e minúsculas, sem `citext`), `name`, `password_hash` (argon2id), `status`, `password_changed_at`, `last_login_at`, `created_at`, `updated_at`. `email_verified_at` virá com a verificação de e-mail |
-| `sessions` | Global (por usuário) | **M02:** `id`, `user_id`, `token_hash` (SHA-256, `bytea`), `created_at`, `last_seen_at`, `expires_at`, `revoked_at`, `revoked_reason`, `ip`, `user_agent`. `active_company_id` virá no M03 |
+| `sessions` | Global (por usuário) | **M02:** `id`, `user_id`, `token_hash` (SHA-256, `bytea`), `created_at`, `last_seen_at`, `expires_at`, `revoked_at`, `revoked_reason`, `ip`, `user_agent`. **M03:** `active_company_id` (FK → `companies`; nulo = sem empresa ativa); `revoked_reason` aceita `company_switched` |
 | `auth_events` | Global (append-only) | **M02:** trilha de segurança de autenticação (login, logout, revogações, rate limit, troca de senha, ações da CLI) |
-| `companies` | Tenant raiz | `id`, `legal_name`, `trade_name`, `tax_id` (CNPJ/CPF), `status`, `plan`, `created_at` |
-| `branches` | Tenant | `id`, `company_id`, `name`, `tax_id`, `timezone`, `address`, `status` |
-| `memberships` | Tenant | `id`, `company_id`, `user_id`, `status`, `all_branches` (bool) |
+| `companies` | Tenant raiz | **M03:** `id`, `legal_name`, `trade_name`, `tax_id` (CNPJ numérico ou alfanumérico, único; sem CPF), `status` (`active`/`suspended`), `created_at`, `updated_at`. Sem `plan` (backlog) e sem dados fiscais (M14) |
+| `branches` | Tenant | **M03:** `id`, `company_id`, `name` (único por empresa), `tax_id` (opcional, único), `timezone` (IANA), `business_day_cutoff` (virada do dia operacional, padrão 04:00), endereço estruturado (`postal_code`, `street`, `number`, `complement`, `district`, `city`, `state`), `status` (`active`/`inactive`); `UNIQUE (company_id, id)` para FKs compostas |
+| `memberships` | Tenant | **M03:** `id`, `company_id`, `user_id`, `status` (`active`/`revoked`), `created_at`, `updated_at`; `UNIQUE (company_id, user_id)`. O **M04** acrescenta `all_branches` e papéis |
 | `membership_branches` | Tenant | `membership_id`, `branch_id`, `company_id` |
 | `roles` | Tenant (+ papéis de sistema) | `id`, `company_id` (nulo = modelo do sistema), `name`, `is_system` |
 | `permissions` | Global (catálogo fixo em código) | `key` (ex.: `orders.cancel`), `description` |
@@ -101,6 +109,8 @@ companies ──< audit_logs
 | `audit_logs` | Tenant | `id`, `company_id`, `branch_id`, `actor_user_id`, `action`, `entity`, `entity_id`, `changes` (jsonb), `ip`, `request_id`, `created_at` |
 
 Detalhes das tabelas do M02 (constraints, índices, privilégios, por que não têm RLS de tenant): [M02 §4 e §10](modules/M02-autenticacao.md). Privilégios do runtime no M02: `users` e `sessions` sem `DELETE`; `auth_events` só `SELECT`/`INSERT` (append-only).
+
+Detalhes das tabelas do M03 (constraints, políticas RLS, empresa ativa): [M03 §3 e §6](modules/M03-empresas-filiais.md). `companies`, `branches` e `memberships` têm `ENABLE` + `FORCE ROW LEVEL SECURITY`, e o runtime não tem `DELETE` nelas (empresa é suspensa, filial inativada, vínculo revogado).
 
 **Usuário é global, vínculo é por empresa.** Uma mesma pessoa (ex.: contador, consultor, dono de duas marcas) pode acessar várias empresas, com papéis diferentes em cada uma.
 
@@ -147,6 +157,8 @@ Para cada tabela de tenant, um teste de integração deve provar que:
 1. A empresa A não lê dados da empresa B.
 2. A empresa A não grava linha com `company_id` de B.
 3. Sem contexto de tenant, a consulta retorna zero linhas.
+
+Referência: `apps/api/test/tenancy-database.int-spec.ts` (M03). O `apps/api/test/tenant-db.int-spec.ts` cobre ainda a reutilização da mesma conexão com outro contexto (caso que exige o `NULLIF` da §2).
 
 ## 7. Backup e retenção (para produção)
 
