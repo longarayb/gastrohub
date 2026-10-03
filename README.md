@@ -2,7 +2,7 @@
 
 Plataforma modular de gestão para food service: restaurantes e hamburguerias no início e, no futuro, outros tipos de operação de alimentação.
 
-> **Status:** M01 — Fundação técnica concluído. M02 — Autenticação implementado (login, sessões, CSRF, rate limiting, CLI de usuários), aguardando aprovação. Ainda sem funcionalidades de negócio ([roadmap](docs/06-ROADMAP.md)).
+> **Status:** M01 — Fundação técnica e M02 — Autenticação concluídos. M03 — Empresas e Filiais implementado (tenancy com RLS, empresa ativa na sessão, CLI de empresas, seletor de empresa na web), aguardando aprovação. Ainda sem funcionalidades de negócio ([roadmap](docs/06-ROADMAP.md)).
 
 ---
 
@@ -70,6 +70,18 @@ Não há cadastro público: usuários são criados por linha de comando. As senh
 | `pnpm user:set-password <email>` | Redefine a senha e encerra todas as sessões (recuperação operacional) |
 | `pnpm user:disable <email>` / `pnpm user:enable <email>` | Desativa (encerra as sessões) / reativa |
 
+### Empresas, filiais e vínculos (CLI)
+
+No M03 não há edição pela web: quem pode editar é uma regra de autorização, que vem no M04. Cada comando age sobre **uma** empresa, e as operações ficam registradas nos logs da aplicação (M03 D12).
+
+| Comando | Função |
+|---|---|
+| `pnpm company:create --legal-name "…" --trade-name "…" --cnpj …` | Cria a empresa (CNPJ numérico ou alfanumérico, com DV validado) e imprime o id |
+| `pnpm company:suspend <companyId>` / `pnpm company:activate <companyId>` | Suspende (nenhum membro acessa) / reativa |
+| `pnpm branch:create <companyId> --name "…" [--cnpj … --timezone … --cutoff HH:MM --cep … --street … --number … --complement … --district … --city … --state UF]` | Cria uma filial (fuso padrão `America/Sao_Paulo`, virada do dia às 04:00) |
+| `pnpm member:add <companyId> <email>` | Vincula um usuário existente (ou reativa o vínculo) |
+| `pnpm member:remove <companyId> <email>` | Revoga o vínculo; o acesso termina na próxima requisição |
+
 | Comando | Função |
 |---|---|
 | `pnpm test` | Testes unitários (contracts, API, web) |
@@ -81,7 +93,7 @@ Não há cadastro público: usuários são criados por linha de comando. As senh
 | `docker compose --profile app up -d --build` | Stack completa em containers (web em http://127.0.0.1:8080) |
 | `docker compose down -v` | Para tudo e **apaga** o volume do banco de desenvolvimento |
 
-Endpoints: `GET /health/live`, `GET /health/ready`, autenticação em `/api/v1/auth/*` ([docs/04-API.md](docs/04-API.md) §10) e OpenAPI em `/api/docs` (somente fora de produção). Web: `/login`, área autenticada em `/`, `/conta/senha`, `/conta/sessoes` e status público em `/status`.
+Endpoints: `GET /health/live`, `GET /health/ready`, autenticação em `/api/v1/auth/*`, empresas em `/api/v1/companies`, `/api/v1/company`, `/api/v1/branches` e `/api/v1/session/active-company` ([docs/04-API.md](docs/04-API.md) §10–§11) e OpenAPI em `/api/docs` (somente fora de produção). Web: `/login`, área autenticada em `/` (exige empresa ativa), `/empresa`, `/selecionar-empresa`, `/conta/senha`, `/conta/sessoes` e status público em `/status`.
 
 Detalhes de ambiente, banco e CI em [docs/05-DEPLOY.md](docs/05-DEPLOY.md).
 

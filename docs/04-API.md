@@ -1,6 +1,6 @@
 # 04 — API
 
-> Status: **convenções em uso**. Endpoints existentes: infraestrutura (M01) e autenticação (M02, §10).
+> Status: **convenções em uso**. Endpoints existentes: infraestrutura (M01), autenticação (M02, §10) e empresas/filiais (M03, §11).
 
 ## 1. Estilo
 
@@ -48,7 +48,7 @@ Erros comuns: 400 (validação), 401 (não autenticado), 403 (sem permissão), 4
 
 Nunca expor stack trace, SQL ou detalhes internos.
 
-Membro de extensão **`code`** (M02, D14): string estável para o frontend tratar o erro sem depender do texto (ex.: `validation_failed`, `invalid_credentials`, `session_expired`, `session_revoked`, `csrf_failed`, `origin_not_allowed`, `rate_limited`). Respostas 429 trazem o cabeçalho `Retry-After`.
+Membro de extensão **`code`** (M02, D14): string estável para o frontend tratar o erro sem depender do texto (ex.: `validation_failed`, `invalid_credentials`, `session_expired`, `session_revoked`, `csrf_failed`, `origin_not_allowed`, `rate_limited`; M03: `active_company_required`, `company_access_revoked`, `company_not_found`). Respostas 429 trazem o cabeçalho `Retry-After`.
 
 ## 5. Paginação, filtros e ordenação
 
@@ -92,8 +92,21 @@ Contratos completos, códigos de erro e fluxos em [M02 §7](modules/M02-autentic
 |---|---|---|---|---|
 | `POST` | `/api/v1/auth/login` | Pública | Origem + JSON | 200 + cookie |
 | `POST` | `/api/v1/auth/logout` | Opcional (idempotente) | Sim, se houver sessão | 204 |
-| `GET` | `/api/v1/auth/session` | Sessão | — | 200 (`user`, `session`, `csrfToken`) |
+| `GET` | `/api/v1/auth/session` | Sessão | — | 200 (`user`, `session`, `csrfToken`, `activeCompany`: M03) |
 | `POST` | `/api/v1/auth/password` | Sessão | Sim | 200 + cookie novo |
 | `GET` | `/api/v1/auth/sessions` | Sessão | — | 200 |
 | `DELETE` | `/api/v1/auth/sessions/{id}` | Sessão | Sim | 204 |
 | `POST` | `/api/v1/auth/sessions/revoke-others` | Sessão | Sim | 204 |
+
+## 11. Empresas e filiais (M03)
+
+Contratos, regras da empresa ativa e fluxos em [M03 §4, §5 e §8](modules/M03-empresas-filiais.md).
+
+| Método | Rota | Empresa ativa | CSRF | Sucesso |
+|---|---|---|---|---|
+| `GET` | `/api/v1/companies` | Não | — | 200: empresas com vínculo ativo do usuário; `active` marca a da sessão |
+| `POST` | `/api/v1/session/active-company` | Não | Sim | 200 (`session`, `csrfToken`, `activeCompany`) + cookie novo; 404 `company_not_found` |
+| `GET` | `/api/v1/company` | **Sim** | — | 200: dados da empresa ativa |
+| `GET` | `/api/v1/branches` | **Sim** | — | 200: filiais da empresa ativa |
+
+Rotas de tenant usam `@RequiresCompany()`: sem empresa ativa → 403 `active_company_required`; vínculo revogado ou empresa suspensa → 403 `company_access_revoked` (a sessão continua válida para escolher outra empresa). Empresa inexistente e empresa sem vínculo respondem o mesmo 404.

@@ -16,8 +16,8 @@
 |---|---|---|---|
 | **M01** | Fundação técnica | Monorepo, NestJS + React, PostgreSQL via Docker Compose, migrations, logging, health checks, testes, CI. **Sem negócio** | — |
 | **M02** | Autenticação e Identidade | Usuários (provisionados por CLI), login/logout, sessões e dispositivos, troca de senha, CSRF, rate limit, eventos de segurança. Recuperação de senha por e-mail **movida** para depois do M04 (D1) | M01 |
-| **M03** | Empresas e Filiais | Tenancy (RLS), cadastro de empresa (dados fiscais) e filiais (fuso, endereço), empresa ativa na sessão | M02 |
-| **M04** | Usuários, Papéis e Permissões | Vínculos, convites, RBAC, escopo por filial, auditoria | M02, M03 |
+| **M03** | Empresas e Filiais | Tenancy (RLS + `TenantDb`), empresas (identificação por CNPJ; dados fiscais no M14) e filiais (fuso, endereço, virada do dia), vínculo mínimo usuário ↔ empresa, empresa ativa na sessão. Gestão por CLI (edição pela web depende do M04) | M02 |
+| **M04** | Usuários, Papéis e Permissões | Papéis sobre os vínculos do M03, convites, RBAC, escopo por filial, auditoria por empresa (`audit_logs`, M03 D12), edição de empresa/filial pela web | M02, M03 |
 
 ### Fase 1 — Catálogo e cadastros
 

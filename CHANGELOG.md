@@ -6,6 +6,29 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ## [Não lançado]
 
+### Adicionado: M03 — Empresas e Filiais (branch `feat/m03-empresas-filiais`)
+
+- **Módulo `organization`**:
+  - tabelas `companies`, `branches` e `memberships` (vínculo mínimo, sem papéis), criadas pela migration `0002_tenancy`;
+  - CNPJ numérico e **alfanumérico** com DV validado na aplicação;
+  - filial com fuso IANA, virada do dia operacional (padrão 04:00) e endereço estruturado;
+  - status em vez de exclusão (o runtime não tem `DELETE`).
+- **Row-Level Security** (ADR-003): `ENABLE` + `FORCE` nas três tabelas; políticas por `app.company_id` e, para o seletor, por `app.user_id`; escrita só na empresa do contexto. As políticas usam `NULLIF` para funcionar em conexões reaproveitadas.
+- **`TenantDb`** (`shared/tenancy`): transação com `app.company_id`/`app.user_id` via `set_config(..., true)`. Uma regra de fronteira nova impede módulos de negócio de usar o pool diretamente.
+- **Empresa ativa na sessão** (`sessions.active_company_id`):
+  - seleção automática no login quando há um único vínculo;
+  - troca com rotação de token e CSRF (`company_switched`);
+  - revalidação do vínculo e do status da empresa a cada requisição de tenant (`TenantGuard`, `@RequiresCompany()`).
+  - O `identity` declara a porta `ACTIVE_COMPANY_PORT`, e o `organization` a implementa, sem dependência invertida.
+- **Endpoints**: `GET /api/v1/companies`, `POST /api/v1/session/active-company`, `GET /api/v1/company`, `GET /api/v1/branches`; `activeCompany` em `GET /api/v1/auth/session` e no login. Códigos novos: `active_company_required`, `company_access_revoked`, `company_not_found`.
+- **CLI operacional** (`pnpm company:create`, `company:suspend`, `company:activate`, `branch:create`, `member:add`, `member:remove`), com eventos nos logs da aplicação (D12; sem `audit_logs`, que vêm no M04).
+- **Web**:
+  - seletor `/selecionar-empresa`, com o estado "sem empresa";
+  - empresa ativa no cabeçalho, com "Trocar empresa" quando há 2 ou mais;
+  - página `/empresa` somente leitura (CNPJ formatado e filiais);
+  - um 403 `company_access_revoked` volta ao seletor com aviso, e a troca de empresa descarta do cache os dados da empresa anterior.
+- **Testes**: isolamento no banco para as três tabelas (A/B, escrita recusada, sem contexto, contexto de usuário, `FORCE`, sem `DELETE`), `TenantDb`, API (inclusive isolamento via HTTP), CLI, CNPJ e regras de filial, e fluxos da web.
+
 ### Adicionado: M02 — Autenticação (branch `feat/m02-autenticacao`)
 
 - **Módulo `identity`**:

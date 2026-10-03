@@ -1,6 +1,6 @@
 # M03 — Empresas e Filiais (Tenancy)
 
-- Status: **Aprovada pelo responsável em 2026-10-03** (D1–D11 sem alteração; D12 com a redação definida pelo responsável). Implementação ainda não iniciada
+- Status: **Aprovada pelo responsável em 2026-10-03** (D1–D11 sem alteração; D12 com a redação definida pelo responsável). **Implementada** na branch `feat/m03-empresas-filiais`, aguardando aprovação para merge (registro na §18)
 - Data: 2026-10-03
 - Dependências: M01, M02 (concluídos)
 - ADRs: [ADR-003](../decisions/ADR-003-multi-tenancy.md) (esta especificação o implementa e não o substitui), [ADR-004](../decisions/ADR-004-autenticacao.md) (empresa ativa na sessão), [ADR-001](../decisions/ADR-001-monolito-modular.md)
@@ -181,6 +181,7 @@ CREATE POLICY tenant_or_member ON companies
   WITH CHECK (id = current_setting('app.company_id', true)::uuid);
 ```
 
+- **Implementação:** cada `current_setting(...)` acima é envolvido em `NULLIF(..., '')` antes do `::uuid` (§18). Em conexões reaproveitadas a variável vale `''`, e não `NULL`.
 - **Escrita** só é permitida na empresa do contexto (`WITH CHECK`). Gravar com `company_id` de outra empresa é recusado pelo banco.
 - A política de `companies` consulta `memberships`, mas a de `memberships` não consulta `companies`: não há recursão.
 - `users`, `sessions` e `auth_events` continuam globais, sem RLS de tenant (M02 §10.2).
@@ -245,7 +246,7 @@ Cada comando aplica `app.company_id` da empresa alvo (caminho explícito, §6.3)
 
 - `RequireCompany`: rotas de tenant redirecionam para `/selecionar-empresa` quando não há empresa ativa.
 - `403 company_access_revoked` em qualquer chamada: limpa o estado e volta ao seletor com a mensagem "Seu acesso a esta empresa foi encerrado."
-- A troca de empresa **limpa todo o cache** de dados do TanStack Query (nada de uma empresa aparece na outra).
+- A troca de empresa **limpa todo o cache** de dados do TanStack Query (nada de uma empresa aparece na outra). Implementação: descarta tudo o que não é da conta (`['auth', …]`) e atualiza a sessão no lugar (§18).
 
 ## 11. Migration
 
@@ -283,17 +284,17 @@ Para `companies`, `branches` e `memberships`, com as empresas A e B:
 
 ## 13. Critérios de aceite
 
-- [ ] Migration `0002_tenancy` aplicada como `gastrohub_owner`
-- [ ] RLS com `FORCE` e as políticas da §6.2 nas três tabelas
-- [ ] Testes de isolamento da §12.1 para cada tabela, inclusive via API
-- [ ] `gastrohub_app` sem `DELETE` e sem DDL (teste)
-- [ ] `TenantDb` usado em todo acesso a tabela de tenant (revisão + regra de fronteira)
-- [ ] Empresa ativa: seleção automática, troca com rotação, revalidação a cada requisição
-- [ ] Endpoints da §8 com Problem Details e códigos novos
-- [ ] CLI da §9
-- [ ] Frontend da §10
-- [ ] Nenhum papel, permissão, convite ou regra de negócio
-- [ ] Lint, fronteiras, typecheck, testes, build e CI verdes; documentação e CHANGELOG atualizados
+- [x] Migration `0002_tenancy` aplicada como `gastrohub_owner`
+- [x] RLS com `FORCE` e as políticas da §6.2 nas três tabelas
+- [x] Testes de isolamento da §12.1 para cada tabela, inclusive via API
+- [x] `gastrohub_app` sem `DELETE` e sem DDL (teste)
+- [x] `TenantDb` usado em todo acesso a tabela de tenant (revisão + regra de fronteira)
+- [x] Empresa ativa: seleção automática, troca com rotação, revalidação a cada requisição
+- [x] Endpoints da §8 com Problem Details e códigos novos
+- [x] CLI da §9
+- [x] Frontend da §10
+- [x] Nenhum papel, permissão, convite ou regra de negócio
+- [x] Lint, fronteiras, typecheck, testes, build e CI verdes; documentação e CHANGELOG atualizados
 - [ ] PR para `main`; merge somente com autorização
 
 ## 14. Estrutura prevista
@@ -354,3 +355,40 @@ D1–D11 aprovadas sem alteração. D12 aprovada com a redação definida pelo r
 - **CNPJ alfanumérico:** o algoritmo de DV converte cada caractere em `código ASCII − 48`, e os dois dígitos verificadores continuam numéricos. Os testes incluem exemplos oficiais.
 - **Unicidade de CNPJ global:** a restrição `UNIQUE` vale entre empresas mesmo com RLS. Na CLI, tentar cadastrar um CNPJ já existente revela que ele existe, mas só ao operador, nunca a usuários da web.
 - O M04 precisará revisitar o `TenantGuard` para acrescentar a verificação de permissões, sem alterar o mecanismo de tenancy.
+
+## 18. Registro de implementação (2026-10-03)
+
+### Diferenças de implementação (sem impacto na arquitetura)
+
+| Item | Especificado | Implementado | Motivo |
+|---|---|---|---|
+| Políticas RLS (§6.2) | `current_setting('app.…', true)::uuid` | `NULLIF(current_setting('app.…', true), '')::uuid` em todas as políticas | Depois que uma variável `app.*` é usada numa conexão, `current_setting` devolve `''` (e não `NULL`) nas transações seguintes. Sem o `NULLIF`, `''::uuid` gera erro em conexões reaproveitadas do pool. Descoberto pelos testes. A migration `0002_tenancy` já sai assim; os bancos locais de desenvolvimento e de teste, criados antes da correção, foram alinhados com `ALTER POLICY` (resultado verificado contra um banco novo) |
+| Serviços (§14) | `CompanyService`, `MembershipService`, `ActiveCompanyService` | `OrganizationService` (leitura e troca), `CompanyLookupService` (vínculo + status, usado pelo guard e pela sessão) e `OrganizationAdminService` (CLI) | Um único serviço que implementasse a porta do `identity` e ao mesmo tempo injetasse o `SessionService` formava um ciclo de injeção. O `CompanyLookupService` não depende do `identity` |
+| `identity` × `organization` (§14) | O `identity` não importa o `organization` | O `identity` declara a porta `ACTIVE_COMPANY_PORT` (`autoSelect`, `describe`) na interface pública; o `organization` a implementa (`useExisting: CompanyLookupService`). O `OrganizationModule` é `@Global` para que o `SessionService` a receba (`@Optional`) | A seleção automática no login e a revalidação precisam de dados do `organization`, mas a dependência continua `organization → identity` (ADR-001). Sem o `organization` (ex.: testes do M02), a sessão funciona sem empresa ativa |
+| Regra de fronteira (§13) | "revisão + regra de fronteira" | Nova regra `tenant-data-only-via-tenant-db` no dependency-cruiser: módulos não importam `shared/database`, exceto `identity` (tabelas globais) e `health` (verificação de conexão) | A regra não existia. Validada com uma importação de prova, que a faz falhar |
+| `activeCompany` (§4.2) | Em `GET /api/v1/auth/session` | Também na resposta do login (`loginResponseSchema`, mesmo formato da sessão atual) | O contrato do M02 já define as duas respostas com o mesmo schema; a web evita uma chamada extra depois do login. Mudança aditiva |
+| Cache na troca (§10) | "Limpa todo o cache" | Descarta todas as queries que não são da conta (`['auth', …]`), invalida a lista de empresas e atualiza a sessão no lugar, com o cookie e o CSRF novos | `queryClient.clear()` removia a query da sessão observada pelo cabeçalho. O componente continuava montado, preso à query removida, e exibia a empresa antiga (encontrado pelo teste do seletor). Nenhum dado de tenant sobrevive à troca |
+| Logs da CLI (D12) | Logs operacionais | Eventos `company_created`, `company_suspended`/`company_activated`, `branch_created`, `membership_added`, `membership_revoked` (e `active_company_switched` na troca pela web), com ids e sem dados pessoais | — |
+| Testes | — | Apoio compartilhado em `apps/api/test/support/tenancy-kit.ts` (CNPJ aleatório válido, empresa + filial + membros) | Importar o apoio de outro arquivo de teste fazia o Vitest executar os testes daquele arquivo de novo |
+
+### Observações
+
+- O teste de fumaça da CLI no banco de **desenvolvimento** criou a empresa "Burger Teste", a filial "Centro" e o vínculo de `dev@gastrohub.local`. São dados fictícios, que podem ser suspensos com `pnpm company:suspend <id>`.
+- A revalidação a cada requisição de tenant custa uma consulta (vínculo + status da empresa). O cache fica no backlog, para quando houver medição.
+
+### Critérios de aceite (§13): resultado
+
+| Critério | Resultado |
+|---|---|
+| Migration `0002_tenancy` como `gastrohub_owner` | ✅ (`pnpm db:migrate`; CI em banco limpo) |
+| RLS com `FORCE` e políticas da §6.2 | ✅ (`tenancy-database.int-spec.ts`) |
+| Isolamento da §12.1, inclusive via API | ✅ (`tenancy-database.int-spec.ts`, `organization-api.int-spec.ts`) |
+| Sem `DELETE` e sem DDL para o runtime | ✅ (`tenancy-database.int-spec.ts`, `database-security.int-spec.ts`) |
+| `TenantDb` em todo acesso a tabela de tenant | ✅ (revisão + `tenant-data-only-via-tenant-db`; `tenant-db.int-spec.ts`) |
+| Empresa ativa: seleção automática, troca com rotação, revalidação | ✅ (`organization-api.int-spec.ts`) |
+| Endpoints da §8 e códigos novos | ✅ |
+| CLI da §9 | ✅ (`organization-cli.int-spec.ts` + teste de fumaça) |
+| Frontend da §10 | ✅ (`organization-flows.spec.tsx`) |
+| Nenhum papel, permissão, convite ou regra de negócio | ✅ |
+| Verificações locais e CI | ✅ (ver o PR) |
+| Merge | Aguardando autorização |

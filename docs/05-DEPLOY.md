@@ -88,7 +88,7 @@ Variáveis novas (ex.: `AUTH_SECRET` e as de sessão do M02) são acrescentadas 
 
 **Não incluídos até haver necessidade:** Redis, fila dedicada, MinIO/S3, Prometheus/Grafana. `mailpit` (e a infraestrutura de e-mail) **não** entra no M02 (D1): virá com a recuperação de senha por e-mail e os convites do M04.
 
-No profile `app`, a API recebe `AUTH_SECRET` do `.env` e `TRUST_PROXY=1` (o nginx é o único proxy à frente dela, D11). Usuários podem ser administrados dentro do container: `docker compose exec api node dist/cli/user-cli.main.js <comando>`.
+No profile `app`, a API recebe `AUTH_SECRET` do `.env` e `TRUST_PROXY=1` (o nginx é o único proxy à frente dela, D11). Usuários podem ser administrados dentro do container: `docker compose exec api node dist/cli/user-cli.main.js <comando>`. Empresas, filiais e vínculos (M03), da mesma forma: `docker compose exec api node dist/cli/organization-cli.main.js <comando>` (comandos no [README](../README.md)). O M03 não traz variáveis de ambiente novas.
 
 ## 5. Ambientes
 

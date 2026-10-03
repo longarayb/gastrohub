@@ -2,10 +2,10 @@
 
 > Status: **aceita**. Decisões em [ADR-001](decisions/ADR-001-monolito-modular.md) e [ADR-002](decisions/ADR-002-stack.md) (ambos aceitos em 2026-10-01).
 
-## 1. Estado atual (M01, 2026-10-01)
+## 1. Estado atual (M03, 2026-10-03)
 
 - Fundação técnica implementada ([M01](modules/M01-fundacao-tecnica.md)): monorepo pnpm, API NestJS/Fastify (ESM), web React/Vite, PostgreSQL 18 em Docker, migrations Drizzle, testes e CI.
-- Único módulo de backend: `health` (técnico). **Nenhuma tabela ou regra de negócio.**
+- Módulos de backend: `health` (técnico), `identity` ([M02](modules/M02-autenticacao.md): usuários, sessões, autenticação) e `organization` ([M03](modules/M03-empresas-filiais.md): empresas, filiais, vínculos, empresa ativa). Mecanismo técnico de tenancy em `shared/tenancy` (`TenantDb`). **Nenhuma regra de negócio** (produtos, pedidos etc.) ainda.
 - Fronteiras entre módulos verificadas por `dependency-cruiser` (`pnpm deps:check`, parte de `pnpm lint` e do CI).
 
 ## 2. Estilo arquitetural: monólito modular
@@ -37,7 +37,9 @@ Uma única aplicação de backend, implantada como uma unidade e dividida em **m
 1. Cada módulo é dono das **suas tabelas**. Outro módulo nunca lê nem escreve essas tabelas diretamente.
 2. A comunicação entre módulos acontece por uma **interface pública** (serviço exportado pelo módulo) ou por **eventos de domínio** em processo.
 3. Dependências entre módulos seguem o grafo do [roadmap](06-ROADMAP.md). Dependências circulares são proibidas.
-4. As fronteiras são verificadas automaticamente por `dependency-cruiser` ([`.dependency-cruiser.cjs`](../.dependency-cruiser.cjs)): um módulo só importa outro via `modules/<modulo>/index.ts`; `shared/` não depende de módulos; `apps/` não importam umas das outras; sem ciclos.
+4. As fronteiras são verificadas automaticamente por `dependency-cruiser` ([`.dependency-cruiser.cjs`](../.dependency-cruiser.cjs)): um módulo só importa outro via `modules/<modulo>/index.ts`; `shared/` não depende de módulos; `apps/` não importam umas das outras; sem ciclos; módulos (exceto `identity` e `health`) acessam o banco só pelo `TenantDb` (`shared/tenancy`), nunca pelo pool (M03).
+
+**Inversão de dependência entre módulos.** Quando um módulo mais básico precisa de algo de um módulo que depende dele, o módulo básico declara uma **porta** (interface + token) na sua interface pública, e o outro a implementa. Exemplo (M03): o `identity` declara `ACTIVE_COMPANY_PORT` (seleção e validação da empresa ativa) e o `organization` o implementa. Assim o `identity` não importa o `organization`, e o grafo continua `organization → identity`.
 
 Com isso, um módulo pode ser extraído para um serviço próprio no futuro, se um dia houver justificativa.
 
