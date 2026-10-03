@@ -1,18 +1,14 @@
-import { randomInt, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 
 import type pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { randomCnpjFormat } from './support/tenancy-kit.ts';
 import { testAppUrl, testOwnerUrl, withClient } from './support/test-database.ts';
 
 // M03 §12.1: isolamento obrigatório por tabela de tenant, direto no banco (ADR-003, docs/02 §6).
 
 const VALID_HASH = '$argon2id$v=19$m=19456,t=2,p=1$c2FsdHNhbHRzYWx0$aGFzaGhhc2hoYXNoaGFzaA';
-
-/** CNPJ com formato válido para o banco (o DV é validado na aplicação). */
-export function randomCnpjFormat(): string {
-  return Array.from({ length: 14 }, () => randomInt(0, 10)).join('');
-}
 
 interface Tenant {
   companyId: string;

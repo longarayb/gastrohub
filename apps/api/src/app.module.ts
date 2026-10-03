@@ -10,6 +10,7 @@ import { type AppConfig } from './shared/config/config.schema.js';
 import { DatabaseModule } from './shared/database/database.module.js';
 import { ProblemDetailsFilter } from './shared/http/problem-details.filter.js';
 import { LoggingModule } from './shared/logging/logging.module.js';
+import { TenancyModule } from './shared/tenancy/tenant-db.js';
 
 export interface AppModuleOptions {
   /** Módulos adicionais (somente testes). */
@@ -27,6 +28,7 @@ export class AppModule {
         ConfigModule.register(config),
         LoggingModule.register(options.logDestination),
         DatabaseModule,
+        TenancyModule,
         IdentityModule,
         HealthModule,
         ...(options.extraModules ?? []),
