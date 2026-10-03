@@ -105,6 +105,12 @@ export class UserAdminService {
     logAuthEvent('user_enabled', { userId: user.id });
   }
 
+  /** Id do usuário pelo e-mail (para vínculos do M03). Lança se não existir. */
+  async findUserIdByEmail(rawEmail: string): Promise<{ id: string; email: string }> {
+    const user = await this.requireUser(rawEmail);
+    return { id: user.id, email: user.email };
+  }
+
   private async requireUser(rawEmail: string): Promise<UserRecord> {
     const user = await this.repo.findUserByEmail(this.normalizeAndValidateEmail(rawEmail));
     if (!user) throw new UserAdminError('Usuário não encontrado.');

@@ -5,6 +5,7 @@ import { APP_FILTER } from '@nestjs/core';
 
 import { HealthModule } from './modules/health/index.js';
 import { IdentityModule } from './modules/identity/index.js';
+import { OrganizationModule } from './modules/organization/index.js';
 import { ConfigModule } from './shared/config/config.module.js';
 import { type AppConfig } from './shared/config/config.schema.js';
 import { DatabaseModule } from './shared/database/database.module.js';
@@ -30,6 +31,7 @@ export class AppModule {
         DatabaseModule,
         TenancyModule,
         IdentityModule,
+        OrganizationModule,
         HealthModule,
         ...(options.extraModules ?? []),
       ],
