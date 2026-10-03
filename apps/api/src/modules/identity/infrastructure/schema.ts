@@ -33,6 +33,8 @@ export const REVOKED_REASONS = [
   'session_limit',
   'user_disabled',
   'operator',
+  // M03: troca de empresa ativa (rotação de token, ADR-004)
+  'company_switched',
 ] as const;
 export type RevokedReason = (typeof REVOKED_REASONS)[number];
 
@@ -100,6 +102,11 @@ export const sessions = pgTable(
     revokedReason: text('revoked_reason').$type<RevokedReason>(),
     ip: inet('ip'),
     userAgent: text('user_agent'),
+    /**
+     * Empresa ativa (M03 §3.4). FK para companies (módulo organization) criada em SQL na
+     * migration 0002_tenancy, sem que este schema importe o do organization (ADR-001).
+     */
+    activeCompanyId: uuid('active_company_id'),
   },
   (t) => [
     unique('sessions_token_hash_key').on(t.tokenHash),
