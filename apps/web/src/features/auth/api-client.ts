@@ -6,9 +6,13 @@ import { type QueryClient } from '@tanstack/react-query';
 export const SESSION_QUERY_KEY = ['auth', 'session'] as const;
 
 export type SessionState =
-  | { status: 'authenticated'; data: CurrentSession }
+  /** `companyRevoked`: o acesso à empresa ativa foi encerrado durante o uso (M03 §10). */
+  | { status: 'authenticated'; data: CurrentSession; companyRevoked?: boolean }
   /** `code`: motivo do último 401 (session_expired, session_revoked...), quando houver. */
   | { status: 'anonymous'; code?: string };
+
+/** Prefixo das queries de dados de tenant: limpas na troca de empresa (M03 §10). */
+export const TENANT_QUERY_PREFIX = 'tenant';
 
 const UNSAFE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
@@ -78,6 +82,20 @@ export async function apiFetch<T>(
     problem.success ? (problem.data.errors ?? []) : [],
     Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : undefined,
   );
+
+  // 403 company_access_revoked: a sessão continua, mas sem empresa ativa (M03 §10).
+  if (error.code === 'company_access_revoked') {
+    const current = queryClient.getQueryData<SessionState>(SESSION_QUERY_KEY);
+    queryClient.removeQueries({ queryKey: [TENANT_QUERY_PREFIX] });
+    if (current?.status === 'authenticated') {
+      const state: SessionState = {
+        status: 'authenticated',
+        data: { ...current.data, activeCompany: null },
+        companyRevoked: true,
+      };
+      queryClient.setQueryData(SESSION_QUERY_KEY, state);
+    }
+  }
 
   // 401 em qualquer chamada: a sessão acabou (§8.3). RequireAuth redireciona para o login.
   if (response.status === 401 && !path.endsWith('/auth/login')) {
