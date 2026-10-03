@@ -48,9 +48,14 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-info}
       API_HOST: 0.0.0.0
       API_PORT: 3000
-      CORS_ORIGINS: http://localhost:8080
+      CORS_ORIGINS: http://localhost:8080,http://127.0.0.1:8080
       # Montada a partir da senha do .env; nenhuma credencial fica neste arquivo.
       DATABASE_URL: postgres://gastrohub_app:${GASTROHUB_APP_PASSWORD:?defina GASTROHUB_APP_PASSWORD no .env}@postgres:5432/gastrohub
+      # M02: segredo de autenticação; cookie Secure (padrão em produção); confia no nginx (D11)
+      AUTH_SECRET: ${AUTH_SECRET:?defina AUTH_SECRET no .env (pnpm env:init -- --add-missing)}
+      SESSION_IDLE_TTL_MINUTES: ${SESSION_IDLE_TTL_MINUTES:-720}
+      SESSION_ABSOLUTE_TTL_HOURS: ${SESSION_ABSOLUTE_TTL_HOURS:-168}
+      TRUST_PROXY: 1
     depends_on:
       postgres:
         condition: service_healthy

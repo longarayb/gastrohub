@@ -20,7 +20,12 @@
     "db:generate": "pnpm --filter @gastrohub/api db:generate",
     "db:migrate": "pnpm --filter @gastrohub/api db:migrate",
     "db:migrate:test": "pnpm --filter @gastrohub/api db:migrate:test",
-    "db:validate": "node scripts/db-validate.mjs"
+    "db:validate": "node scripts/db-validate.mjs",
+    "user:create": "pnpm --filter @gastrohub/contracts build && pnpm --filter @gastrohub/api build && node apps/api/dist/cli/user-cli.main.js create",
+    "user:set-password": "pnpm --filter @gastrohub/contracts build && pnpm --filter @gastrohub/api build && node apps/api/dist/cli/user-cli.main.js set-password",
+    "user:disable": "pnpm --filter @gastrohub/contracts build && pnpm --filter @gastrohub/api build && node apps/api/dist/cli/user-cli.main.js disable",
+    "user:enable": "pnpm --filter @gastrohub/contracts build && pnpm --filter @gastrohub/api build && node apps/api/dist/cli/user-cli.main.js enable",
+    "seed:dev": "pnpm --filter @gastrohub/contracts build && pnpm --filter @gastrohub/api build && node apps/api/dist/cli/user-cli.main.js seed-dev"
   },
   "devDependencies": {
     "@gastrohub/config": "workspace:*",

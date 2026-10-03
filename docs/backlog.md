@@ -24,9 +24,14 @@ Formato: `[módulo-alvo] descrição: origem/motivo`.
 
 ## Identidade e acesso
 
-- [M02] MFA por TOTP (prioritário para Proprietário/Gerente).
-- [M02] Verificação contra senhas vazadas (lista k-anonymity).
-- [M02] Lista de sessões ativas com revogação pelo próprio usuário.
+- [Pós-M04] **Recuperação de senha por e-mail**, verificação de e-mail e infraestrutura de e-mail (SMTP, mailpit, templates), junto dos convites do M04: D1 do M02. Até lá, redefinição via CLI.
+- [Futuro] MFA por TOTP (prioritário para Proprietário/Gerente): movido do M02.
+- [Futuro] Verificação contra senhas vazadas via HIBP (k-anonymity): chamada externa e decisão de privacidade (M02 D8; hoje: lista local SecLists).
+- ~~[M02] Lista de sessões ativas com revogação pelo próprio usuário~~: entregue no M02.
+- [M04] Timeouts de sessão menores por papel (ex.: administradores): M02 §5.2.
+- [Deploy/jobs] Expurgo de `sessions` (30 dias após o fim) e `auth_events` (180 dias), executado como `gastrohub_owner`: M02 §9.9.
+- [Técnico] Rate limit de login com contagem atômica: hoje os contadores são lidos antes da tentativa, e requisições paralelas podem ultrapassar o limite por poucas tentativas (M02 §20).
+- [Técnico] Rate limit global distribuído (Redis) quando houver mais de uma instância da API: M02 §9.5.
 - [M04] Aprovação de supervisor para ações críticas (cancelamento de pedido pago, estorno, ajuste de estoque).
 - [M11] PIN de operador para troca rápida em terminal de PDV.
 - [Futuro] Login social / SSO para redes maiores.

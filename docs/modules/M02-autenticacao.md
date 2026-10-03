@@ -1,6 +1,6 @@
 # M02 — Autenticação
 
-- Status: **Aprovada pelo responsável em 2026-10-02** (D1–D15 aprovadas; D4 com o ajuste incorporado na §9.5). Implementação ainda não iniciada
+- Status: **Aprovada pelo responsável em 2026-10-02** (D1–D15 aprovadas; D4 com o ajuste incorporado na §9.5). **Implementada** na branch `feat/m02-autenticacao`, aguardando aprovação para merge (registro na §20)
 - Data: 2026-10-02
 - Dependências: M01 (concluído)
 - ADRs: [ADR-004](../decisions/ADR-004-autenticacao.md) (aceito; esta especificação o detalha e não o substitui), [ADR-003](../decisions/ADR-003-multi-tenancy.md), [ADR-001](../decisions/ADR-001-monolito-modular.md), [ADR-002](../decisions/ADR-002-stack.md)
@@ -800,3 +800,61 @@ Branch `feat/m02-autenticacao`; commits pequenos; PR para `main`; merge só com 
 7. Testes de integração da §14.2.
 8. Frontend: `apiFetch`, sessão, `RequireAuth`, páginas e testes.
 9. Configuração (`env:init`, `.env.example`, compose `TRUST_PROXY`), documentação e CHANGELOG.
+
+## 20. Registro de implementação (2026-10-02)
+
+### Decisões do responsável durante a implementação
+
+| Tema | Decisão | Motivo |
+|---|---|---|
+| Local da CLI (§6.9) | CLI em `apps/api/src/cli/`, **compilada com a API** (`node dist/cli/user-cli.main.js`), em vez de `apps/api/scripts/` com type stripping | O type stripping do Node não resolve os imports `.js` do código da API (padrão ESM do M01). Compilada, a CLI reaproveita o módulo `identity` sem duplicar regras de segurança e funciona também na imagem de produção (`docker compose exec api node dist/cli/user-cli.main.js …`) |
+| Parte local do e-mail na senha (§9.2) | A regra vale para partes locais com **4 ou mais** caracteres | Partes muito curtas (ex.: `a@…`) rejeitariam quase qualquer senha |
+| Lista de senhas comuns (§9.2) | **SecLists 10k** (`Passwords/Common-Credentials/10k-most-common.txt`, licença MIT), versionada em `domain/common-passwords.ts` com o SHA-256 da origem e a licença | Fonte de referência reconhecida |
+
+### Diferenças de implementação (sem impacto na arquitetura)
+
+| Item | Especificado | Implementado | Motivo |
+|---|---|---|---|
+| Schema agregado (§11) | Exportado pelo schema agregado | `drizzle.config.ts` agrega por glob (`src/modules/*/infrastructure/schema.ts`); o placeholder `src/shared/database/schema.ts` do M01 foi removido | A regra de fronteiras do M01 proíbe `shared/` de importar `modules/` |
+| `bytea` | `bytea` | `customType` do Drizzle | O drizzle-orm 0.45 não tem o tipo nativo |
+| JSON obrigatório (§9.4) | Corpo apenas `application/json` | Parser `text/plain` removido **e** parsers do Nest desligados (`bodyParser: false`) | Os testes mostraram que o Nest registrava um parser de formulário (`x-www-form-urlencoded`); agora formulários recebem 415 |
+| `TRUST_PROXY` (§9.5) | Número de proxies | Função equivalente (`hop < N`) | A tipagem do `FastifyAdapter` do NestJS 12 não aceita `number` |
+| nginx do profile `app` (D11) | API confia no nginx | `nginx.conf` passou a **sobrescrever** `X-Forwarded-For` com `$remote_addr` | O nginx do M01 não enviava o cabeçalho: todos os clientes pareciam o próprio nginx, e os limites por IP seriam compartilhados. Verificado também que um `X-Forwarded-For` forjado pelo cliente é ignorado |
+| Limite global (§9.5) | 429 genérico | `ApiException` (Problem Details com `code` e `Retry-After`) | Mesmo formato dos demais 429 |
+| `env:init` (§12) | Documentar como acrescentar `AUTH_SECRET` | `pnpm env:init -- --add-missing` acrescenta só as variáveis ausentes, sem exibir segredos | Evita regenerar as senhas do banco e evita segredo no terminal |
+| `--password-stdin` | Lê a senha do stdin | Remove um BOM UTF-8 inicial | O PowerShell 5.1 prefixa o pipe com BOM (descoberto no teste de fumaça real) |
+| `login_rate_limited` | Registro interno do bloqueio | Gravado com `identifier_hash` e IP, sem `user_id` | O bloqueio é decidido antes de consultar o usuário (sem consulta extra e sem diferença de tempo) |
+| Testes | — | `createApp` aceita módulos extras e destino de log (somente testes) | Rota de prova do guard padrão e captura de logs para o teste de segredos |
+
+### Observações
+
+- Só **10** das 10.001 senhas da lista SecLists têm 12 ou mais caracteres. A regra de tamanho mínimo já elimina a maioria das senhas comuns; a lista cobre os casos restantes.
+- Os contadores de rate limit são lidos antes da tentativa (consultar e depois agir). Requisições paralelas podem ultrapassar o limite por poucas tentativas. Isso é aceitável para o objetivo (impedir força bruta em escala), mas está registrado no backlog.
+
+### Critérios de aceite (§15): resultado
+
+| Critério | Resultado |
+|---|---|
+| Migration `0001_identity_auth` como `gastrohub_owner` em `gastrohub` e `gastrohub_test` | ✅ |
+| Tabelas com constraints e índices da §4 | ✅ (`identity-database.int-spec.ts`) |
+| `gastrohub_app` sem DDL, com os privilégios exatos da §10.1 | ✅ (testes `42501`) |
+| Senhas só em Argon2id com os parâmetros da §9.1 | ✅ |
+| Token nunca armazenado nem logado; banco só com SHA-256 | ✅ (`auth-secrets.int-spec.ts`) |
+| Atributos do cookie; `__Host-` e `Secure` fora de dev | ✅ |
+| Endpoints da §7 | ✅ |
+| Expiração, revogação e rotação (§5) | ✅ |
+| Falhas de login indistinguíveis | ✅ (corpo, cabeçalhos e Argon2id executado) |
+| CSRF: origem, JSON e token | ✅ |
+| Rate limits (conta + IP, conta, IP, global), incluindo e-mail inexistente | ✅ |
+| Bloqueio por conta indistinguível; 429 só IP/global; escopo em `auth_events` | ✅ |
+| Mitigação de lockout (IP confiável) | ✅ |
+| Guard global nega por padrão | ✅ (rota de prova) |
+| `auth_events` para todos os eventos; append-only | ✅ |
+| Logs sem senha, token ou CSRF | ✅ |
+| CLI `user:create`, `user:set-password`, `user:disable`, `user:enable`, sem senha em argumentos | ✅ |
+| Frontend: login, rotas protegidas, expirada/revogada, logout, senha, sessões | ✅ |
+| Nenhuma tabela/coluna/regra de RBAC, empresa ou filial | ✅ (teste: só `users`, `sessions`, `auth_events`; nenhuma coluna `company_id`/`branch_id`) |
+| Contratos em `packages/contracts`; OpenAPI | ✅ |
+| Lint, fronteiras, typecheck, testes, build e CI | ✅ local; CI no PR |
+| Documentação e CHANGELOG | ✅ |
+| PR com CI verde; merge só com autorização | ⏳ |

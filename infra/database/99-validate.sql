@@ -67,13 +67,20 @@ SELECT (SELECT count(*) FROM pg_class c JOIN pg_roles r ON r.oid = c.relowner
        (SELECT count(*) FROM pg_namespace s JOIN pg_roles r ON r.oid = s.nspowner
          WHERE r.rolname = 'gastrohub_app')     AS schemas;
 
-\echo '== Tabelas fora dos catálogos (esperado: apenas drizzle.__drizzle_migrations após migrations) =='
+\echo '== Tabelas fora dos catálogos (esperado após migrations: drizzle.__drizzle_migrations + users, sessions, auth_events) =='
 SELECT table_schema, table_name, pg_get_userbyid(c.relowner) AS owner
 FROM information_schema.tables t
 JOIN pg_class c ON c.relname = t.table_name
 JOIN pg_namespace s ON s.oid = c.relnamespace AND s.nspname = t.table_schema
 WHERE t.table_schema NOT IN ('pg_catalog', 'information_schema')
 ORDER BY 1, 2;
+
+\echo '== Privilégios do runtime por tabela (esperado: users/sessions sem DELETE; auth_events só INSERT,SELECT) =='
+SELECT table_name, string_agg(privilege_type, ',' ORDER BY privilege_type) AS gastrohub_app
+FROM information_schema.role_table_grants
+WHERE grantee = 'gastrohub_app' AND table_schema = 'public'
+GROUP BY table_name
+ORDER BY table_name;
 
 \echo '== Schema drizzle (esperado: app sem USAGE; vazio se migrations ainda não rodaram) =='
 SELECT n.nspname AS schema,

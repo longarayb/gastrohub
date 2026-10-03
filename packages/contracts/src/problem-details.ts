@@ -8,6 +8,8 @@ export const problemDetailsSchema = z.object({
   detail: z.string().optional(),
   instance: z.string().optional(),
   requestId: z.string().optional(),
+  /** Código estável para o frontend (membro de extensão, RFC 9457 §3.2). */
+  code: z.string().optional(),
   errors: z
     .array(
       z.object({

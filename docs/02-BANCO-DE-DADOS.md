@@ -87,8 +87,9 @@ companies ──< audit_logs
 
 | Tabela | Escopo | Campos principais |
 |---|---|---|
-| `users` | Global | `id`, `email` (único, citext), `password_hash`, `name`, `status`, `email_verified_at`, `created_at` |
-| `sessions` | Global (por usuário) | `id`, `user_id`, `token_hash`, `active_company_id`, `ip`, `user_agent`, `expires_at`, `revoked_at` |
+| `users` | Global | **M02:** `id`, `email` (único, `text` normalizado: NFC, trim e minúsculas, sem `citext`), `name`, `password_hash` (argon2id), `status`, `password_changed_at`, `last_login_at`, `created_at`, `updated_at`. `email_verified_at` virá com a verificação de e-mail |
+| `sessions` | Global (por usuário) | **M02:** `id`, `user_id`, `token_hash` (SHA-256, `bytea`), `created_at`, `last_seen_at`, `expires_at`, `revoked_at`, `revoked_reason`, `ip`, `user_agent`. `active_company_id` virá no M03 |
+| `auth_events` | Global (append-only) | **M02:** trilha de segurança de autenticação (login, logout, revogações, rate limit, troca de senha, ações da CLI) |
 | `companies` | Tenant raiz | `id`, `legal_name`, `trade_name`, `tax_id` (CNPJ/CPF), `status`, `plan`, `created_at` |
 | `branches` | Tenant | `id`, `company_id`, `name`, `tax_id`, `timezone`, `address`, `status` |
 | `memberships` | Tenant | `id`, `company_id`, `user_id`, `status`, `all_branches` (bool) |
@@ -98,6 +99,8 @@ companies ──< audit_logs
 | `role_permissions` | Tenant | `role_id`, `permission_key`, `company_id` |
 | `membership_roles` | Tenant | `membership_id`, `role_id`, `company_id` |
 | `audit_logs` | Tenant | `id`, `company_id`, `branch_id`, `actor_user_id`, `action`, `entity`, `entity_id`, `changes` (jsonb), `ip`, `request_id`, `created_at` |
+
+Detalhes das tabelas do M02 (constraints, índices, privilégios, por que não têm RLS de tenant): [M02 §4 e §10](modules/M02-autenticacao.md). Privilégios do runtime no M02: `users` e `sessions` sem `DELETE`; `auth_events` só `SELECT`/`INSERT` (append-only).
 
 **Usuário é global, vínculo é por empresa.** Uma mesma pessoa (ex.: contador, consultor, dono de duas marcas) pode acessar várias empresas, com papéis diferentes em cada uma.
 

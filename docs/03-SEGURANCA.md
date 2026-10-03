@@ -1,6 +1,6 @@
 # 03 — Segurança
 
-> Status: **estratégia inicial (proposta)**. Nada aqui está implementado ainda.
+> Status: **autenticação implementada no M02** (§1, CSRF, rate limiting, logs e `auth_events`; detalhes em [M02](modules/M02-autenticacao.md)). Autorização (RBAC), isolamento por empresa e auditoria por empresa continuam como estratégia para M03/M04.
 > Este documento **não** afirma conformidade com nenhuma norma ou lei (incluindo LGPD), nem certificação. Conformidade exige implementação, processos e evidências, que serão produzidos ao longo dos módulos.
 
 ## 1. Autenticação
@@ -10,13 +10,13 @@ Decisão em [ADR-004](decisions/ADR-004-autenticacao.md).
 | Item | Estratégia |
 |---|---|
 | Credencial | E-mail + senha |
-| Hash de senha | **Argon2id** (parâmetros recomendados pela OWASP, revisados periodicamente) |
-| Política de senha | Mínimo de 12 caracteres; verificação contra lista de senhas vazadas; sem regras de composição arbitrárias |
-| Sessão | Token opaco aleatório (256 bits) em cookie `httpOnly`, `Secure`, `SameSite=Lax`. O banco guarda apenas o **hash** do token |
-| Expiração | Expiração por inatividade + expiração absoluta; rotação do token no login e na troca de empresa ativa |
-| Revogação | Logout, troca de senha e ação do administrador revogam sessões |
-| Força bruta | Rate limit por IP e por conta; atraso progressivo; mensagem genérica ("credenciais inválidas") |
-| Recuperação | Token de uso único, expira em minutos, armazenado como hash |
+| Hash de senha | **Argon2id** `m=19456 KiB, t=2, p=1` (mínimo OWASP), `@node-rs/argon2`, rehash automático, até 4 verificações simultâneas |
+| Política de senha | 12 a 128 caracteres (NFC); sem regras de composição; bloqueio das 10 mil senhas mais comuns (SecLists), da parte local do e-mail (4+ caracteres) e do nome. Verificação de vazamentos (HIBP) no backlog |
+| Sessão | Token opaco de 256 bits em cookie `HttpOnly`, `SameSite=Lax`, `Path=/`, sem `Domain`; `__Host-gh_session` com `Secure` fora de desenvolvimento. O banco guarda só o SHA-256 do token |
+| Expiração | Inatividade (12 h) + absoluta (7 dias), configuráveis; rotação no login e na troca de senha (troca de empresa ativa: M03) |
+| Revogação | Logout, encerrar sessão/outras sessões, troca de senha, usuário desativado e redefinição pelo operador (CLI) |
+| Força bruta | Rate limit por conta + IP (5/15 min), conta (20/60 min, com isenção de IP confiável) e IP (50/15 min), por janela (em vez de atraso progressivo). Bloqueio por conta é indistinguível de credenciais inválidas; 429 só por IP/global |
+| Recuperação | Por e-mail: módulo posterior (junto dos convites do M04). No M02, redefinição operacional via CLI (`pnpm user:set-password`) |
 | MFA | TOTP no backlog, prioritário para papéis administrativos |
 | PIN de operador (PDV) | Avaliar no módulo PDV (troca rápida de operador em terminal já autenticado). Não substitui o login |
 
@@ -50,10 +50,10 @@ Detalhado em [02-BANCO-DE-DADOS](02-BANCO-DE-DADOS.md) §2:
 |---|---|
 | **SQL Injection** | Queries parametrizadas via Drizzle; proibido concatenar SQL com entrada do usuário; SQL bruto só com `sql` template parametrizado e revisão |
 | **XSS** | React escapa por padrão; proibido `dangerouslySetInnerHTML` sem sanitização; cabeçalho Content-Security-Policy restritivo; cookies `httpOnly` |
-| **CSRF** | `SameSite=Lax` + exigência de cabeçalho customizado/token CSRF em métodos mutáveis + validação de `Origin` |
+| **CSRF** | Implementado no M02: `Origin` (ou `Sec-Fetch-Site: same-origin`) em todo método mutável + corpo somente JSON (formulários e `text/plain` → 415) + token sincronizador `X-CSRF-Token` (HMAC do id da sessão) nas rotas autenticadas; `SameSite=Lax` como camada adicional |
 | **Validação de entrada** | Schema zod em toda entrada (body, query, params); rejeitar campos desconhecidos; limites de tamanho |
 | **Mass assignment** | DTOs explícitos; `company_id` e campos de controle nunca vêm do cliente |
-| **Rate limiting** | Global por IP + regras mais restritas em login, recuperação de senha e endpoints caros. Em memória no início; Redis quando houver várias instâncias |
+| **Rate limiting** | Global: 300 req/min por IP (em memória; Redis quando houver várias instâncias). Login e troca de senha: contadores no PostgreSQL (`auth_events`), válidos entre instâncias (M02 §9.5) |
 | **Cabeçalhos** | Helmet: HSTS, CSP, `X-Content-Type-Options`, `Referrer-Policy`, `frame-ancestors` |
 | **CORS** | Lista explícita de origens permitidas |
 | **Dependências** | Lockfile versionado; Dependabot/Renovate; `pnpm audit` no CI |
@@ -64,6 +64,7 @@ Detalhado em [02-BANCO-DE-DADOS](02-BANCO-DE-DADOS.md) §2:
 - **Logs de aplicação** (pino, JSON): `request_id`, `user_id`, `company_id`, rota, status e latência. **Nunca** registrar senhas, tokens, cookies ou dados de cartão. O logger terá uma lista de redaction.
 - **Auditoria** (`audit_logs`, append-only): login/logout, falhas de login, mudanças de permissão, criação ou remoção de usuários, cancelamentos, estornos, ajustes de estoque, abertura e fechamento de caixa, alteração de preço. O registro guarda quem, o quê, quando, de onde e os valores antes e depois.
 - O papel da aplicação não pode alterar nem apagar registros de auditoria.
+- **M02:** eventos de autenticação ficam em `auth_events` (global, pré-tenant, append-only para o runtime). E-mails digitados em tentativas são guardados só como HMAC. A `audit_logs` por empresa (M04) registrará as ações de negócio.
 
 ## 7. LGPD: diretrizes de projeto
 

@@ -69,6 +69,8 @@ Modelo versionado: [`.env.example`](../.env.example) (sem valores reais). O `.en
 - **nunca** imprime nem registra as senhas;
 - **não sobrescreve** um `.env` existente sem confirmação interativa (em modo não interativo, recusa).
 
+Variáveis novas (ex.: `AUTH_SECRET` e as de sessão do M02) são acrescentadas a um `.env` existente com `pnpm env:init -- --add-missing`, que não toca nas senhas já em uso e não exibe segredos.
+
 > Sobrescrever o `.env` gera senhas novas, mas o volume do PostgreSQL já inicializado mantém as antigas. Nesse caso: `docker compose down -v` e `docker compose up -d` (apaga os dados de desenvolvimento).
 
 ## 4. Docker Compose
@@ -84,7 +86,9 @@ Modelo versionado: [`.env.example`](../.env.example) (sem valores reais). O `.en
 - Imagens sem root em runtime (`node` uid 1000; `nginx` uid 101), sem código-fonte nem dependências de desenvolvimento.
 - `.dockerignore` mantém `.env` e segredos fora do contexto de build.
 
-**Não incluídos até haver necessidade:** Redis, fila dedicada, MinIO/S3, Prometheus/Grafana. `mailpit` entra no M02 (e-mails de convite e recuperação de senha).
+**Não incluídos até haver necessidade:** Redis, fila dedicada, MinIO/S3, Prometheus/Grafana. `mailpit` (e a infraestrutura de e-mail) **não** entra no M02 (D1): virá com a recuperação de senha por e-mail e os convites do M04.
+
+No profile `app`, a API recebe `AUTH_SECRET` do `.env` e `TRUST_PROXY=1` (o nginx é o único proxy à frente dela, D11). Usuários podem ser administrados dentro do container: `docker compose exec api node dist/cli/user-cli.main.js <comando>`.
 
 ## 5. Ambientes
 

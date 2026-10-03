@@ -5,6 +5,9 @@ import pg from 'pg';
 import { assertTestDatabaseUrl } from '../../scripts/lib/database-target.ts';
 import { type AppConfig, parseConfig } from '../../src/shared/config/config.schema.js';
 
+/** Origem confiável usada pelos testes HTTP (CORS + validação de origem do CSRF). */
+export const TEST_ORIGIN = 'http://app.gastrohub.test';
+
 /** URL de runtime (gastrohub_app) do banco de teste. */
 export function testAppUrl(): string {
   return assertTestDatabaseUrl(process.env.TEST_DATABASE_URL, 'TEST_DATABASE_URL');
@@ -38,6 +41,8 @@ export function testConfig(overrides: Record<string, string> = {}): AppConfig {
     NODE_ENV: 'test',
     LOG_LEVEL: 'silent',
     DATABASE_URL: testAppUrl(),
+    AUTH_SECRET: process.env.AUTH_SECRET,
+    CORS_ORIGINS: TEST_ORIGIN,
     ...overrides,
   });
 }

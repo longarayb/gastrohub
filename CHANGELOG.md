@@ -6,6 +6,32 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ## [Não lançado]
 
+### Adicionado: M02 — Autenticação (branch `feat/m02-autenticacao`)
+
+- **Módulo `identity`**:
+  - tabelas `users`, `sessions` e `auth_events`, criadas pela migration `0001_identity_auth` (como `gastrohub_owner`);
+  - o runtime não tem `DELETE` em `users`/`sessions`, e `auth_events` é append-only.
+- **Sessões opacas**:
+  - token de 256 bits, com só o SHA-256 no banco;
+  - cookie `HttpOnly`, `SameSite=Lax`, `Path=/`, sem `Domain`, `__Host-gh_session` com `Secure` fora de desenvolvimento;
+  - expiração por inatividade (12 h) e absoluta (7 dias);
+  - revogação, rotação no login e na troca de senha, limite de 20 sessões.
+- **Argon2id** (`m=19456, t=2, p=1`) com rehash e limite de concorrência. Política de senha com lista SecLists 10k (MIT).
+- **Endpoints `/api/v1/auth`**: login, logout, sessão atual, troca de senha, sessões (listar, encerrar uma, encerrar as outras). Erros em Problem Details com o membro `code`.
+- **Guard global de autenticação**, que nega por padrão (`@Public()` para rotas públicas). CSRF em três camadas: origem, JSON obrigatório e token sincronizador.
+- **Rate limiting** por conta + IP, conta e IP (no PostgreSQL), mais 300 req/min global:
+  - bloqueio por conta indistinguível de credenciais inválidas;
+  - isenção por IP confiável contra lockout.
+- **CLI operacional** (`pnpm user:create`, `user:set-password`, `user:disable`, `user:enable`, `seed:dev`): senhas só por TTY sem eco ou `--password-stdin`.
+- **Web**: `/login`, rotas protegidas, sessão expirada/revogada, logout, `/conta/senha`, `/conta/sessoes`. O status foi para `/status`.
+- **Configuração**: `AUTH_SECRET`, `SESSION_IDLE_TTL_MINUTES`, `SESSION_ABSOLUTE_TTL_HOURS`, `SESSION_COOKIE_SECURE`, `TRUST_PROXY`; `pnpm env:init -- --add-missing`.
+- **Testes**: unitários (API, contracts, web) e de integração (login, sessões, CSRF, rate limiting, lockout, troca de senha, segredos fora do banco e dos logs, eventos, CLI, privilégios do banco).
+
+### Alterado: M02
+
+- Recuperação de senha por e-mail, verificação de e-mail e infraestrutura de e-mail saem do M02 (D1) e vão para depois do M04.
+- Os parsers de corpo do Nest foram desligados: só JSON é aceito (formulários e `text/plain` recebem 415).
+
 ### Adicionado: M01 — Fundação técnica (branch `feat/m01-fundacao-tecnica`)
 
 - **PostgreSQL 18.6 em Docker** como banco oficial de desenvolvimento (`127.0.0.1:5432`), com os bancos `gastrohub` e `gastrohub_test` (ICU `pt-BR`, UTF8, `template0`) e os papéis `gastrohub_owner` (DDL) e `gastrohub_app` (somente DML, sem `CREATE`/`TEMPORARY`, sem SUPERUSER/BYPASSRLS).

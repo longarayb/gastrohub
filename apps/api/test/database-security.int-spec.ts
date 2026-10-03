@@ -147,17 +147,29 @@ describe('banco de teste: configuração e privilégios', () => {
     });
   });
 
-  it('migrations aplicadas e nenhuma tabela de negócio no schema public', async () => {
-    const row = await withClient(testOwnerUrl(), async (client) => {
-      const { rows } = await client.query(
-        `SELECT (SELECT count(*)::int FROM drizzle.__drizzle_migrations) AS migrations,
-                (SELECT count(*)::int FROM information_schema.tables
-                  WHERE table_schema = 'public') AS public_tables`,
+  it('migrations aplicadas; no schema public apenas as tabelas de identidade do M02', async () => {
+    const result = await withClient(testOwnerUrl(), async (client) => {
+      const migrations = await client.query<{ n: number }>(
+        'SELECT count(*)::int AS n FROM drizzle.__drizzle_migrations',
       );
-      return rows[0];
+      const tables = await client.query<{ table_name: string }>(
+        `SELECT table_name FROM information_schema.tables
+          WHERE table_schema = 'public' ORDER BY table_name`,
+      );
+      const tenantColumns = await client.query<{ n: number }>(
+        `SELECT count(*)::int AS n FROM information_schema.columns
+          WHERE table_schema = 'public' AND column_name IN ('company_id', 'branch_id')`,
+      );
+      return {
+        migrations: migrations.rows[0]?.n,
+        tables: tables.rows.map((r) => r.table_name),
+        tenantColumns: tenantColumns.rows[0]?.n,
+      };
     });
-    expect(row?.migrations).toBeGreaterThanOrEqual(1);
-    expect(row?.public_tables).toBe(0);
+    expect(result.migrations).toBeGreaterThanOrEqual(2);
+    // Nenhuma tabela de negócio, de tenant ou de RBAC (M02 §16).
+    expect(result.tables).toEqual(['auth_events', 'sessions', 'users']);
+    expect(result.tenantColumns).toBe(0);
   });
 
   it(`o banco de teste é "${database}" (sufixo _test)`, () => {

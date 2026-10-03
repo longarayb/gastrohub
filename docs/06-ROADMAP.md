@@ -15,7 +15,7 @@
 | ID | Módulo | Entrega principal | Depende de |
 |---|---|---|---|
 | **M01** | Fundação técnica | Monorepo, NestJS + React, PostgreSQL via Docker Compose, migrations, logging, health checks, testes, CI. **Sem negócio** | — |
-| **M02** | Autenticação e Identidade | Usuários, login/logout, sessões, recuperação de senha, rate limit de login | M01 |
+| **M02** | Autenticação e Identidade | Usuários (provisionados por CLI), login/logout, sessões e dispositivos, troca de senha, CSRF, rate limit, eventos de segurança. Recuperação de senha por e-mail **movida** para depois do M04 (D1) | M01 |
 | **M03** | Empresas e Filiais | Tenancy (RLS), cadastro de empresa (dados fiscais) e filiais (fuso, endereço), empresa ativa na sessão | M02 |
 | **M04** | Usuários, Papéis e Permissões | Vínculos, convites, RBAC, escopo por filial, auditoria | M02, M03 |
 
