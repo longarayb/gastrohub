@@ -68,6 +68,7 @@ export class AuthController {
       user: result.user,
       session: this.sessions.sessionInfo(result.session),
       csrfToken: this.sessions.csrfToken(result.session.id),
+      activeCompany: null,
     };
   }
 
@@ -98,6 +99,7 @@ export class AuthController {
       user: { id: session.user.id, email: session.user.email, name: session.user.name },
       session: this.sessions.sessionInfo(session),
       csrfToken: this.sessions.csrfToken(session.id),
+      activeCompany: null,
     };
   }
 

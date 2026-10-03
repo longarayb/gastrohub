@@ -46,10 +46,19 @@ export const sessionInfoSchema = z.object({
 });
 export type SessionInfo = z.infer<typeof sessionInfoSchema>;
 
+/** Empresa ativa da sessão (M03 §4.2; campo aditivo previsto na M02 §10.3). */
+export const sessionActiveCompanySchema = z
+  .object({
+    id: z.uuid(),
+    tradeName: z.string(),
+  })
+  .nullable();
+
 export const loginResponseSchema = z.object({
   user: authUserSchema,
   session: sessionInfoSchema,
   csrfToken: z.string(),
+  activeCompany: sessionActiveCompanySchema,
 });
 export type LoginResponse = z.infer<typeof loginResponseSchema>;
 
